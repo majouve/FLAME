@@ -1,0 +1,146 @@
+---
+title: "LocationDuplicates"
+output: html_document
+---
+
+lat = x 
+long = y
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(janitor)
+library(kableExtra)
+library(infer)
+library(broom)
+library(sjPlot)
+library(tidyr)
+library(stargazer)
+library(haven)
+library(gridExtra)
+library(naniar)
+library(equatiomatic)
+library(xtable)
+library(regclass)
+
+library(cobalt)
+library(MatchIt)
+library(CBPS)
+
+library(simputation)
+library(Amelia)
+library(balance)
+library(see)
+library(performance)
+library(ggrepel)
+library(qqplotr)
+library(dataReporter)
+
+```
+
+Read in Data
+```{r}
+CoinFinds = read.csv("CoinData/CoinFinds.csv")
+CoinGroups = read.csv("CoinData/CoinGroups.csv")
+```
+
+*** Testing
+Check for NAs - none for lat and longitude
+```{r}
+colSums(is.na(CoinFinds))
+```
+
+This code creates the data frame "ClosestNeighbor.CF", which puts the information of the closet geographical neighbor by lattitude and longitude on the same line. The neighboring data's headings have "n." added to them. 
+
+The code is currently set for distance to be in km. Switching which d is used in the code below can change it to degrees.
+```{r}
+library(rgeos)
+library(sp)
+library(geosphere)
+
+GEO_cf = CoinFinds
+coordinates(GEO_cf) = ~cf_custom_y_coordinate+cf_custom_x_coordinate
+
+
+#d = gDistance(GEO_cf, byid=T) # distance in km
+d = distm(GEO_cf) # distance in degrees
+
+min.d <- apply(d, 1, function(x) order(x, decreasing=F)[2])
+
+
+ClosestN.CF <- cbind(CoinFinds, CoinFinds[min.d,], apply(d, 1, function(x) sort(x, decreasing=F)[2]))
+
+colnames(ClosestN.CF) <- c(colnames(CoinFinds), "n.ID", "n.cf_name", "n.cf_place_name", "n.cf_custom_place_name", "n.cf_custom_x_coordinate", "n.cf_custom_y_coordinate", "n.cf_custom_region", "n.cf_custom_region_vague", "n.cf_excavation_name", "n.cf_excavation", "n.cf_excavation_start", "n.cf_excavation_end", "n.cf_single_find", "n.cf_hoard", "n.cf_start_year", "n.cf_end_year", "n.cf_vague", "n.cf_num_coins_found", "n.cf_publication_ref", "n.cf_user", "n.cf_comment", "n.cf_date_entered", "n.Coin.Find.Search", "n.Coin.Find.Json", "n.Exported.at", "distance")
+
+#Ordering ClosestN.CF by distance
+
+
+```
+
+Isolating those that have a distance from each other equal to zero
+```{r}
+#Ordering ClosestN.CF by distance
+#ClosestN.CF = ClosestN.CF[order(ClosestN.CF$distance),]
+
+ClosestEqualsZero = ClosestN.CF[ClosestN.CF$distance==0,]
+
+ClosestEqualsOther = ClosestN.CF[ClosestN.CF$distance>0,]
+
+OverviewOfEqualZero = data.frame(
+  
+  ID = ClosestEqualsZero$ID,
+  CF = ClosestEqualsZero$cf_name,
+  
+  Neighbor_ID = ClosestEqualsZero$n.ID,
+  Neighboring_CF = ClosestEqualsZero$n.cf_name,
+  
+  Latitude = ClosestEqualsZero$cf_custom_x_coordinate,
+  Longitude = ClosestEqualsZero$cf_custom_y_coordinate,
+  Neighbor_Latitude = ClosestEqualsZero$n.cf_custom_x_coordinate,
+  Neighbor_Longitude = ClosestEqualsZero$n.cf_custom_y_coordinate,
+  
+  distance = ClosestEqualsZero$distance
+
+)
+
+
+OverviewEqualsOther = data.frame(
+  
+  ID = ClosestEqualsOther$ID,
+  CF = ClosestEqualsOther$cf_name,
+  
+  Neighbor_ID = ClosestEqualsOther$n.ID,
+  Neighboring_CF = ClosestEqualsOther$n.cf_name,
+  
+  Latitude = ClosestEqualsOther$cf_custom_x_coordinate,
+  Longitude = ClosestEqualsOther$cf_custom_y_coordinate,
+  Neighbor_Latitude = ClosestEqualsOther$n.cf_custom_x_coordinate,
+  Neighbor_Longitude = ClosestEqualsOther$n.cf_custom_y_coordinate,
+  
+  distance = ClosestEqualsOther$distance
+
+)
+
+
+# I've noticed that for some points, it will list the closet value to it as itself. These points only seem to be those that are already listed as the closest to another point. So I think it's fine if I strip them out?
+
+# This works for now as a preliminary solution, but I will definetly want to check to see if this correct. 
+# For now, I am stripping out ones that repeat 
+
+```
+*****
+
+*** 
+Radius Method: For each coin find location, return all coin finds within a certain radius. 
+
+
+
+
+
+
+
+
+
+
+
+
