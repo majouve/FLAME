@@ -36,6 +36,10 @@ library(ggrepel)
 library(qqplotr)
 library(dataReporter)
 
+library(tidyverse)
+library(sf)
+library(hash)
+
 ```
 
 Read in Data
@@ -54,78 +58,75 @@ This code creates the data frame "ClosestNeighbor.CF", which puts the informatio
 
 The code is currently set for distance to be in km. Switching which d is used in the code below can change it to degrees.
 ```{r}
-library(rgeos)
-library(sp)
-library(geosphere)
-
-GEO_cf = CoinFinds
-coordinates(GEO_cf) = ~cf_custom_y_coordinate+cf_custom_x_coordinate
-
-
-#d = gDistance(GEO_cf, byid=T) # distance in km
-d = distm(GEO_cf) # distance in degrees
-
-min.d <- apply(d, 1, function(x) order(x, decreasing=F)[2])
-
-
-ClosestN.CF <- cbind(CoinFinds, CoinFinds[min.d,], apply(d, 1, function(x) sort(x, decreasing=F)[2]))
-
-colnames(ClosestN.CF) <- c(colnames(CoinFinds), "n.ID", "n.cf_name", "n.cf_place_name", "n.cf_custom_place_name", "n.cf_custom_x_coordinate", "n.cf_custom_y_coordinate", "n.cf_custom_region", "n.cf_custom_region_vague", "n.cf_excavation_name", "n.cf_excavation", "n.cf_excavation_start", "n.cf_excavation_end", "n.cf_single_find", "n.cf_hoard", "n.cf_start_year", "n.cf_end_year", "n.cf_vague", "n.cf_num_coins_found", "n.cf_publication_ref", "n.cf_user", "n.cf_comment", "n.cf_date_entered", "n.Coin.Find.Search", "n.Coin.Find.Json", "n.Exported.at", "distance")
-
-#Ordering ClosestN.CF by distance
-
-
+# library(rgeos)
+# library(sp)
+# library(geosphere)
+# 
+# GEO_cf = CoinFinds
+# coordinates(GEO_cf) = ~cf_custom_y_coordinate+cf_custom_x_coordinate
+# 
+# #d = gDistance(GEO_cf, byid=T) # distance in km
+# d = distm(GEO_cf) # distance in degrees
+# 
+# min.d <- apply(d, 1, function(x) order(x, decreasing=F)[2])
+# 
+# ClosestN.CF <- cbind(CoinFinds, CoinFinds[min.d,], apply(d, 1, function(x) sort(x, decreasing=F)[2]))
+# 
+# colnames(ClosestN.CF) <- c(colnames(CoinFinds), "n.ID", "n.cf_name", "n.cf_place_name", "n.cf_custom_place_name", "n.cf_custom_x_coordinate", "n.cf_custom_y_coordinate", "n.cf_custom_region", "n.cf_custom_region_vague", "n.cf_excavation_name", "n.cf_excavation", "n.cf_excavation_start", "n.cf_excavation_end", "n.cf_single_find", "n.cf_hoard", "n.cf_start_year", "n.cf_end_year", "n.cf_vague", "n.cf_num_coins_found", "n.cf_publication_ref", "n.cf_user", "n.cf_comment", "n.cf_date_entered", "n.Coin.Find.Search", "n.Coin.Find.Json", "n.Exported.at", "distance")
+# 
+# #Ordering ClosestN.CF by distance
+# 
 ```
 
 Isolating those that have a distance from each other equal to zero
 ```{r}
-#Ordering ClosestN.CF by distance
-#ClosestN.CF = ClosestN.CF[order(ClosestN.CF$distance),]
-
-ClosestEqualsZero = ClosestN.CF[ClosestN.CF$distance==0,]
-
-ClosestEqualsOther = ClosestN.CF[ClosestN.CF$distance>0,]
-
-OverviewOfEqualZero = data.frame(
-  
-  ID = ClosestEqualsZero$ID,
-  CF = ClosestEqualsZero$cf_name,
-  
-  Neighbor_ID = ClosestEqualsZero$n.ID,
-  Neighboring_CF = ClosestEqualsZero$n.cf_name,
-  
-  Latitude = ClosestEqualsZero$cf_custom_x_coordinate,
-  Longitude = ClosestEqualsZero$cf_custom_y_coordinate,
-  Neighbor_Latitude = ClosestEqualsZero$n.cf_custom_x_coordinate,
-  Neighbor_Longitude = ClosestEqualsZero$n.cf_custom_y_coordinate,
-  
-  distance = ClosestEqualsZero$distance
-
-)
-
-
-OverviewEqualsOther = data.frame(
-  
-  ID = ClosestEqualsOther$ID,
-  CF = ClosestEqualsOther$cf_name,
-  
-  Neighbor_ID = ClosestEqualsOther$n.ID,
-  Neighboring_CF = ClosestEqualsOther$n.cf_name,
-  
-  Latitude = ClosestEqualsOther$cf_custom_x_coordinate,
-  Longitude = ClosestEqualsOther$cf_custom_y_coordinate,
-  Neighbor_Latitude = ClosestEqualsOther$n.cf_custom_x_coordinate,
-  Neighbor_Longitude = ClosestEqualsOther$n.cf_custom_y_coordinate,
-  
-  distance = ClosestEqualsOther$distance
-
-)
-
-
-# I've noticed that for some points, it will list the closet value to it as itself. These points only seem to be those that are already listed as the closest to another point. So I think it's fine if I strip them out?
-
-# This works for now as a preliminary solution, but I will definetly want to check to see if this correct. 
-# For now, I am stripping out ones that repeat 
+# #Ordering ClosestN.CF by distance
+# #ClosestN.CF = ClosestN.CF[order(ClosestN.CF$distance),]
+# 
+# ClosestEqualsZero = ClosestN.CF[ClosestN.CF$distance==0,]
+# 
+# ClosestEqualsOther = ClosestN.CF[ClosestN.CF$distance>0,]
+# 
+# OverviewOfEqualZero = data.frame(
+#   
+#   ID = ClosestEqualsZero$ID,
+#   CF = ClosestEqualsZero$cf_name,
+#   
+#   Neighbor_ID = ClosestEqualsZero$n.ID,
+#   Neighboring_CF = ClosestEqualsZero$n.cf_name,
+#   
+#   Latitude = ClosestEqualsZero$cf_custom_x_coordinate,
+#   Longitude = ClosestEqualsZero$cf_custom_y_coordinate,
+#   Neighbor_Latitude = ClosestEqualsZero$n.cf_custom_x_coordinate,
+#   Neighbor_Longitude = ClosestEqualsZero$n.cf_custom_y_coordinate,
+#   
+#   distance = ClosestEqualsZero$distance
+# 
+# )
+# 
+# 
+# OverviewEqualsOther = data.frame(
+#   
+#   ID = ClosestEqualsOther$ID,
+#   CF = ClosestEqualsOther$cf_name,
+#   
+#   Neighbor_ID = ClosestEqualsOther$n.ID,
+#   Neighboring_CF = ClosestEqualsOther$n.cf_name,
+#   
+#   Latitude = ClosestEqualsOther$cf_custom_x_coordinate,
+#   Longitude = ClosestEqualsOther$cf_custom_y_coordinate,
+#   Neighbor_Latitude = ClosestEqualsOther$n.cf_custom_x_coordinate,
+#   Neighbor_Longitude = ClosestEqualsOther$n.cf_custom_y_coordinate,
+#   
+#   distance = ClosestEqualsOther$distance
+# 
+# )
+# 
+# 
+# # I've noticed that for some points, it will list the closet value to it as itself. These points only seem to be those that are already listed as the closest to another point. So I think it's fine if I strip them out?
+# 
+# # This works for now as a preliminary solution, but I will definetly want to check to see if this correct. 
+# # For now, I am stripping out ones that repeat 
 
 ```
 *****
@@ -133,7 +134,120 @@ OverviewEqualsOther = data.frame(
 *** 
 Radius Method: For each coin find location, return all coin finds within a certain radius. 
 
+Need to fix
+```{r}
 
+
+# Set radius within which the program will find coin find sights near the central point 
+RADIUS = 1000
+cf_nrow = nrow(CoinFinds)
+radius.df <- data.frame(matrix(ncol = 2, nrow = cf_nrow))
+colnames(radius.df) <- c('ID', 'cluster')
+
+#create seperate ID list
+# len = nrow(CoinFinds)-5200
+
+for (i in c(1:cf_nrow)) { 
+
+    # reference point
+  point_ID = CoinFinds$ID[i]
+  point <- data_frame(mylon = CoinFinds$cf_custom_y_coordinate[i], mylat = CoinFinds$cf_custom_x_coordinate[i]) 
+  point_sf <- st_as_sf(point, coords = c("mylon", "mylat"))
+  st_crs(point_sf) <- 4326
+  
+  longitude_list = CoinFinds$cf_custom_y_coordinate[-i]
+  latitude_list = CoinFinds$cf_custom_x_coordinate[-i]
+  
+  # target point
+  target <- data_frame(longitude = longitude_list, latitude = latitude_list)
+  # Specify the source of X and Y coordinates
+  target_sf <- st_as_sf(target, coords = c("longitude", "latitude"))
+  # Set the projection to EPSG 4326 (long-lat)
+  st_crs(target_sf) <- 4326
+  
+  # filter records within distance specified 
+  target_sf2 <- target_sf %>%
+    mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
+    filter(Dist <= RADIUS)
+  
+#  list(st_coordinates(target_sf2))
+  #radius_list[[4]] = list(point_ID, )
+  
+  # print(target_sf2)
+  
+   # radius.df$ID[i] = point_ID
+   # radius.df$cluster[i] = st_coordinates(target_sf2)
+  
+ 
+ }
+
+
+```
+
+DEBUG Radius Method
+```{r}
+
+RADIUS = 1000
+cf_nrow = nrow(CoinFinds)
+radius.ids = hash()
+  
+index = 25
+
+  point_ID = CoinFinds$ID[index]
+  point <- data_frame(ID = point_ID, mylon = CoinFinds$cf_custom_y_coordinate[index], mylat = CoinFinds$cf_custom_x_coordinate[index]) 
+  point_sf <- st_as_sf(point, coords = c("mylon", "mylat"))
+  st_crs(point_sf) <- 4326
+  
+  longitude_list = CoinFinds$cf_custom_y_coordinate
+  latitude_list = CoinFinds$cf_custom_x_coordinate
+  IDs_list = CoinFinds$ID
+  
+  # target point
+  target <- data_frame(ID = IDs_list, longitude = longitude_list, latitude = latitude_list)
+  # Specify the source of X and Y coordinates
+  target_sf <- st_as_sf(target, coords = c("longitude", "latitude"))
+  # Set the projection to EPSG 4326 (long-lat)
+  st_crs(target_sf) <- 4326
+  
+  # filter records within distance specified 
+  target_sf2 <- target_sf %>%
+    mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
+    filter(Dist <= RADIUS)
+
+  print(point_ID)
+  print(target_sf2)
+  print(st_coordinates(target_sf2))
+    
+  test.target = target_sf2 %>% as.data.frame 
+  test.point = point_sf %>% as.data.frame
+  
+  radius.ids[[as.character(point_ID)]] = test.target$ID
+  
+
+
+```
+
+
+
+- I was able to attach the ID to the longitude and latitude. So now, I can actually identify which coin finds in the radius correspond to which main point. 
+- Now I just need to figure out the best format to output one focal point with points attached to it. 
+- Up until this point, I have it outputting the focal point in one data frame and the three points in the radius into another dataframe. 
+Maybe I can create a dataframe similar to the Coin Groups df that labels each find with the what's in the radius?
+- create new coin finds dataframe that will be much lengthier. It will have a focal point ID column so that finds within a certain radius of the focal point will be listed. Will definetly have repeats. 
+- or I can save it as a dictionary of IDs. This will a be much more efficient way to do this i think. Need to integrate this into the for loop
+
+NOTES
+*Couldn't delete repeat points because it breaks the above code. So I need to find a way to delete that at a later point
+*Best way to work with coin finds is on the basis of IDs and not the coordinates. Can maybe create a function that returns coordinates when I need them. 
+
+
+Quantity Filter
+```{r}
+
+
+
+
+```
 
 
 
