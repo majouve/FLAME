@@ -10,35 +10,9 @@ long = y
 library(dplyr)
 library(ggplot2)
 library(janitor)
-library(kableExtra)
-library(infer)
-library(broom)
-library(sjPlot)
 library(tidyr)
-library(stargazer)
-library(haven)
-library(gridExtra)
-library(naniar)
-library(equatiomatic)
-library(xtable)
-library(regclass)
-
-library(cobalt)
-library(MatchIt)
-library(CBPS)
-
-library(simputation)
-library(Amelia)
-library(balance)
-library(see)
-library(performance)
-library(ggrepel)
-library(qqplotr)
-library(dataReporter)
-
 library(tidyverse)
 library(sf)
-library(hash)
 
 ```
 
@@ -131,123 +105,175 @@ Isolating those that have a distance from each other equal to zero
 ```
 *****
 
-*** 
+
 Radius Method: For each coin find location, return all coin finds within a certain radius. 
 
-Need to fix
+Location Filter: For each coin find location, return all coin finds within a certain radius in a list, forming a column of the dataframe CoinFinds
 ```{r}
-
-
-# Set radius within which the program will find coin find sights near the central point 
+#####INPUT####
 RADIUS = 1000
-cf_nrow = nrow(CoinFinds)
-radius.df <- data.frame(matrix(ncol = 2, nrow = cf_nrow))
-colnames(radius.df) <- c('ID', 'cluster')
+##############
 
-#create seperate ID list
-# len = nrow(CoinFinds)-5200
+cf_nrow = nrow(CoinFinds) - 3000
+CoinFinds$in.radius = NA
+CoinFinds$num.in.radius = NA
 
-for (i in c(1:cf_nrow)) { 
+### Using the sf package, creating spatial objects out of each coin find's lat and long points
+longitude_list = CoinFinds$cf_custom_y_coordinate
+latitude_list = CoinFinds$cf_custom_x_coordinate
+IDs_list = CoinFinds$ID
+# target point
+target <- data_frame(ID = IDs_list, longitude = longitude_list, latitude = latitude_list)
+# Specify the source of lat and long coordinates
+target_sf <- st_as_sf(target, coords = c("longitude", "latitude"))
+st_crs(target_sf) <- 4326
 
-    # reference point
-  point_ID = CoinFinds$ID[i]
-  point <- data_frame(mylon = CoinFinds$cf_custom_y_coordinate[i], mylat = CoinFinds$cf_custom_x_coordinate[i]) 
-  point_sf <- st_as_sf(point, coords = c("mylon", "mylat"))
-  st_crs(point_sf) <- 4326
-  
-  longitude_list = CoinFinds$cf_custom_y_coordinate[-i]
-  latitude_list = CoinFinds$cf_custom_x_coordinate[-i]
-  
-  # target point
-  target <- data_frame(longitude = longitude_list, latitude = latitude_list)
-  # Specify the source of X and Y coordinates
-  target_sf <- st_as_sf(target, coords = c("longitude", "latitude"))
-  # Set the projection to EPSG 4326 (long-lat)
-  st_crs(target_sf) <- 4326
-  
-  # filter records within distance specified 
-  target_sf2 <- target_sf %>%
-    mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
-    filter(Dist <= RADIUS)
-  
-#  list(st_coordinates(target_sf2))
-  #radius_list[[4]] = list(point_ID, )
-  
-  # print(target_sf2)
-  
-   # radius.df$ID[i] = point_ID
-   # radius.df$cluster[i] = st_coordinates(target_sf2)
-  
- 
- }
+for (i in c(1:cf_nrow)) {
+  index = i
 
-
-```
-
-DEBUG Radius Method
-```{r}
-
-RADIUS = 1000
-cf_nrow = nrow(CoinFinds)
-radius.ids = hash()
-  
-index = 25
-
+  # creating sf spatial object out of the central point in radius
   point_ID = CoinFinds$ID[index]
   point <- data_frame(ID = point_ID, mylon = CoinFinds$cf_custom_y_coordinate[index], mylat = CoinFinds$cf_custom_x_coordinate[index]) 
   point_sf <- st_as_sf(point, coords = c("mylon", "mylat"))
   st_crs(point_sf) <- 4326
   
-  longitude_list = CoinFinds$cf_custom_y_coordinate
-  latitude_list = CoinFinds$cf_custom_x_coordinate
-  IDs_list = CoinFinds$ID
-  
-  # target point
-  target <- data_frame(ID = IDs_list, longitude = longitude_list, latitude = latitude_list)
-  # Specify the source of X and Y coordinates
-  target_sf <- st_as_sf(target, coords = c("longitude", "latitude"))
-  # Set the projection to EPSG 4326 (long-lat)
-  st_crs(target_sf) <- 4326
-  
-  # filter records within distance specified 
+#  filter records within the RADIUS specified (THE SECTION THAT SLOWS DOWN FOR-LOOP)
   target_sf2 <- target_sf %>%
     mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
     filter(Dist <= RADIUS)
+  
+  #adding IDs of coin finds in radius to CoinFinds data frame
+  test.target = target_sf2 %>% as_tibble()
+  rad.IDs = list(test.target$ID)
+  CoinFinds$in.radius[index] = I(rad.IDs)
+  CoinFinds$num.in.radius[index] = length(test.target$ID)
+}
 
-  print(point_ID)
-  print(target_sf2)
-  print(st_coordinates(target_sf2))
-    
-  test.target = target_sf2 %>% as.data.frame 
-  test.point = point_sf %>% as.data.frame
+# filtering on points that only have themselves as closest point. Going forward, this is the data frame that will entries struck from it if they are not of interest. In the end, it will contain only finds that need attention.
+Cut_CoinFinds = CoinFinds[CoinFinds$num.in.radius > 1,]
+
+```
+
+NOTES
+*at this point, the above code works, it just takes forever to run. Possible solution: 
+Some sort of long,lat condition that takes some points out of consideration from the section taking the most time. Still thinking about that...
+
+Quantity Filter 
+```{r}
+# function that will output number of coins found from an coin find ID
+ID_toget_numCoins = function(ID) {
+  nums_list <- rep(NULL, length(ID))
+  for (i in c(1:length(ID))) {
+    row = CoinFinds[CoinFinds$ID==ID[i],][1,]
+    nums_list[i] = row$cf_num_coins_found
+  }
+  return(nums_list)
+}
+#Cut_CoinFinds = ifelse(Cut_CoinFinds$cf_num_coins_found)
+
+####INPUT#### 
+RANGE = 5
+#############
+
+
+# This creates another row in Cut_CoinFinds that returns a list of TRUE/FALSE for each coin find in the radius. TRUE: the number of coins found for a coin find are equal to (+/- a range set by user) the total coins found for the central coin find. FALSE: not the same within a certain range set by user
+for (z in c(1:nrow(Cut_CoinFinds))) {
+  index = z
+  point_ID = Cut_CoinFinds$ID[index]
+  point_coins = Cut_CoinFinds$cf_num_coins_found[index]
+  rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
+  numCoinsList = ID_toget_numCoins(rad.IDs)
   
-  radius.ids[[as.character(point_ID)]] = test.target$ID
+  # print("Coin ID")
+  # print(point_ID)
+  # print("Num of Coins for Find")
+  # print(numCoinsList)
+  # print("IDs of Fines")
+  # print(rad.IDs)
   
+  are.num.coins.same = rep(NULL, length(numCoinsList))
+  for (o in c(1:length(numCoinsList))) {
+    if (numCoinsList[o] <= (point_coins+RANGE) & 
+        numCoinsList[o] >= (point_coins-RANGE)){
+      are.num.coins.same[o] = TRUE
+    } else {
+      are.num.coins.same[o] = FALSE  }}
+
+  Cut_CoinFinds$are.num.coins.same[index] = I(list(are.num.coins.same))
+
+}
 
 
 ```
 
-
-
-- I was able to attach the ID to the longitude and latitude. So now, I can actually identify which coin finds in the radius correspond to which main point. 
-- Now I just need to figure out the best format to output one focal point with points attached to it. 
-- Up until this point, I have it outputting the focal point in one data frame and the three points in the radius into another dataframe. 
-Maybe I can create a dataframe similar to the Coin Groups df that labels each find with the what's in the radius?
-- create new coin finds dataframe that will be much lengthier. It will have a focal point ID column so that finds within a certain radius of the focal point will be listed. Will definetly have repeats. 
-- or I can save it as a dictionary of IDs. This will a be much more efficient way to do this i think. Need to integrate this into the for loop
-
 NOTES
-*Couldn't delete repeat points because it breaks the above code. So I need to find a way to delete that at a later point
-*Best way to work with coin finds is on the basis of IDs and not the coordinates. Can maybe create a function that returns coordinates when I need them. 
+some coin finds have no coins found. 
 
 
-Quantity Filter
+Metal Filter
 ```{r}
 
 
 
 
 ```
+
+Excavation Year Filter
+```{r}
+
+####INPUT####
+START_RANGE = 3
+END_RANGE = 3
+#############
+
+# insert big for loop
+
+  #start year
+  index = z
+  point_ID = Cut_CoinFinds$ID[index]
+  point_coins = Cut_CoinFinds$cf_excavation_start[index]
+  rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
+ # numCoinsList = ID_toget_numCoins(rad.IDs) Nee func for excav start year
+  
+  #end year
+  point_ID = Cut_CoinFinds$ID[index]
+  point_coins = Cut_CoinFinds$cf_excavation_end[index]
+  rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
+ # numCoinsList = ID_toget_numCoins(rad.IDs) Nee func for excav end year
+
+
+  are.excav.start.same = rep(NULL, length(numCoinsList))
+  are.excav.end.same = rep(NULL, length(numCoinsList))
+  for (o in c(1:length(numCoinsList))) {
+    
+
+    #edit this part
+    # testing if start year same within range
+    if (numCoinsList[o] <= (point_coins+RANGE) & 
+        numCoinsList[o] >= (point_coins-RANGE)){
+      are.num.coins.same[o] = TRUE
+    } else {
+      are.num.coins.same[o] = FALSE  }
+    
+    # testing if end year same within range
+    if (numCoinsList[o] <= (point_coins+RANGE) & 
+        numCoinsList[o] >= (point_coins-RANGE)){
+      are.num.coins.same[o] = TRUE
+    } else {
+      are.num.coins.same[o] = FALSE  }
+    
+    }
+
+  Cut_CoinFinds$are.num.coins.same[index] = I(list(are.num.coins.same))
+
+  # END
+
+```
+
+
+
+
+
 
 
 
