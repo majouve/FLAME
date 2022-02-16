@@ -105,16 +105,106 @@ Isolating those that have a distance from each other equal to zero
 ```
 *****
 
+Functions
+```{r}
+# Function for finding excavation start years from IDs
+ID_toget_start = function(ID) {
+  nums_list <- rep(NULL, length(ID))
+  for (i in c(1:length(ID))) {
+    row = Cut_CoinFinds[Cut_CoinFinds$ID==ID[i],][1,]
+    nums_list[i] = row$cf_excavation_start
+  }
+  return(nums_list)
+}
 
-Radius Method: For each coin find location, return all coin finds within a certain radius. 
+# Function for finding excavation end years from IDs
+ID_toget_end = function(ID) {
+  nums_list <- rep(NULL, length(ID))
+  for (i in c(1:length(ID))) {
+    row = Cut_CoinFinds[Cut_CoinFinds$ID==ID[i],][1,]
+    nums_list[i] = row$cf_excavation_end
+  }
+  return(nums_list)
+}
+##########
 
-Location Filter: For each coin find location, return all coin finds within a certain radius in a list, forming a column of the dataframe CoinFinds
+# Function for finding start years from IDs
+ID_toget_startyear = function(ID) {
+  nums_list <- rep(NULL, length(ID))
+  for (i in c(1:length(ID))) {
+    row = Cut_CoinFinds[Cut_CoinFinds$ID==ID[i],][1,]
+    nums_list[i] = row$cf_start_year
+  }
+  return(nums_list)
+}
+
+# Function for finding start years from IDs
+ID_toget_endyear = function(ID) {
+  nums_list <- rep(NULL, length(ID))
+  for (i in c(1:length(ID))) {
+    row = Cut_CoinFinds[Cut_CoinFinds$ID==ID[i],][1,]
+    nums_list[i] = row$cf_end_year
+  }
+  return(nums_list)
+}
+
+# function that will output number of coins found from an coin find ID
+ID_toget_numCoins = function(ID) {
+  nums_list <- rep(NULL, length(ID))
+  for (i in c(1:length(ID))) {
+    row = CoinFinds[CoinFinds$ID==ID[i],][1,]
+    nums_list[i] = row$cf_num_coins_found
+  }
+  return(nums_list)
+}
+
+# function that will output list of coin group IDs from a coin find ID
+CF_to_CG = function(cf_IDs) {
+  
+ # for (i in c(1:length(cf_IDs))) {
+    
+  row = CoinGroups[CoinGroups$cfID==cf_IDs,]
+  nums_list = row$cgID
+    
+#  }
+  return(nums_list)
+  
+}
+
+```
+
+
+# Initial Changing of CoinFinds (QUESTION)
+```{r}
+
+for( i in c(1:nrow(CoinFinds))) {
+  
+  # using CoinGroups to replace NA values in cf_num_coins_found
+  # issue with this, some of the coins in the coin groups are also listed as NA
+   if(is.na(CoinFinds$cf_num_coins_found[i])) {
+     
+    CGs = CoinGroups[CoinGroups$cfID==CoinFinds$ID[i],]
+    print(CoinFinds$ID[i])
+    Sum = sum(CGs$cg_num_coins)
+    CoinFinds$cf_num_coins_found[i] = Sum
+     
+   }
+  
+}
+
+#### 10019 still NA because its NA in Coin Groups file.
+# taking out rows where cf_num_coins_found is equal to 0
+#CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found != 0 & !is.na(CoinFinds$cf_num_coins_found),]
+
+```
+
+Location Filter: For each coin find location, return all coin finds within a certain radius in a list, forming a column of the dataframe CoinFinds (DONE)
 ```{r}
 #####INPUT####
 RADIUS = 1000
 ##############
 
-cf_nrow = nrow(CoinFinds) - 3000
+cf_nrow = nrow(CoinFinds) - 2000
 CoinFinds$in.radius = NA
 CoinFinds$num.in.radius = NA
 
@@ -137,7 +227,7 @@ for (i in c(1:cf_nrow)) {
   point_sf <- st_as_sf(point, coords = c("mylon", "mylat"))
   st_crs(point_sf) <- 4326
   
-#  filter records within the RADIUS specified (THE SECTION THAT SLOWS DOWN FOR-LOOP)
+  #  filter records within the RADIUS specified (THE SECTION THAT SLOWS DOWN FOR-LOOP)
   target_sf2 <- target_sf %>%
     mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
     filter(Dist <= RADIUS)
@@ -149,27 +239,18 @@ for (i in c(1:cf_nrow)) {
   CoinFinds$num.in.radius[index] = length(test.target$ID)
 }
 
+
 # filtering on points that only have themselves as closest point. Going forward, this is the data frame that will entries struck from it if they are not of interest. In the end, it will contain only finds that need attention.
-Cut_CoinFinds = CoinFinds[CoinFinds$num.in.radius > 1,]
+# Ok on second though, I may just carry through with the whole Data Frame and make cuts at the end
+Cut_CoinFinds = CoinFinds
 
 ```
 
-NOTES
-*at this point, the above code works, it just takes forever to run. Possible solution: 
-Some sort of long,lat condition that takes some points out of consideration from the section taking the most time. Still thinking about that...
-
-Quantity Filter 
+Quantity Filter (DONE)
 ```{r}
-# function that will output number of coins found from an coin find ID
-ID_toget_numCoins = function(ID) {
-  nums_list <- rep(NULL, length(ID))
-  for (i in c(1:length(ID))) {
-    row = CoinFinds[CoinFinds$ID==ID[i],][1,]
-    nums_list[i] = row$cf_num_coins_found
-  }
-  return(nums_list)
-}
-#Cut_CoinFinds = ifelse(Cut_CoinFinds$cf_num_coins_found)
+
+#cutting it at where the previous for loop stopped
+Cut_CoinFinds = Cut_CoinFinds[1:3084,]
 
 ####INPUT#### 
 RANGE = 5
@@ -184,15 +265,14 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
   numCoinsList = ID_toget_numCoins(rad.IDs)
   
-  # print("Coin ID")
-  # print(point_ID)
-  # print("Num of Coins for Find")
-  # print(numCoinsList)
-  # print("IDs of Fines")
-  # print(rad.IDs)
-  
   are.num.coins.same = rep(NULL, length(numCoinsList))
   for (o in c(1:length(numCoinsList))) {
+    
+    if (is.na(numCoinsList[o])) {
+      are.num.coins.same[o] = NA
+      next
+    }
+    
     if (numCoinsList[o] <= (point_coins+RANGE) & 
         numCoinsList[o] >= (point_coins-RANGE)){
       are.num.coins.same[o] = TRUE
@@ -207,76 +287,183 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
 ```
 
 NOTES
-some coin finds have no coins found. 
-
 
 Metal Filter
 ```{r}
 
+####INPUT#### 
+RANGE = 5
+#############
 
+for (z in c(1:nrow(Cut_CoinFinds))) {
+  index = z
+  
+  point_ID = Cut_CoinFinds$ID[index]
+  point_cgIDs = CF_to_CG(point_ID)
+  # need to find metals for the point as well.
+  
+  rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
+  
+  CoinGroups$which.metals.are.same = NA
+#  rad.IDS = list(rad.IDs)
+  
+  # For each coin find within the main point's radius, which have the same amounts of the same metals (And which metals are the same; create a metal.radius.same column?)?
+  for (o in c(1:length(rad.IDs))) {
+    
+    CGs = CoinGroups[CoinGroups$cfID==rad.IDs[o],]
+    
+    # How do I figure out how to find the metal of each coin type?
+          # Write a function? or find a way to export it?
+    
+    # Once you get a list of which metals correspond to which coin amount, 
+    # then you can subset it by each type of denomination
+    # so you will get silver, gold, and bronze variables
+    
+    
+    # CHANGE Final if statements to get into comparing amounts
 
+    
+  #Add to Cut_CoinFinds
+ # Cut_CoinFinds$are.num.coins.same[index] = I(list(are.num.coins.same))
+
+}
+
+}
 
 ```
+Questions
 
-Excavation Year Filter
+Excavation Year Filter (DONE)
 ```{r}
-
 ####INPUT####
 START_RANGE = 3
 END_RANGE = 3
 #############
 
-# insert big for loop
-
-  #start year
+for (z in c(1:nrow(Cut_CoinFinds))) {
   index = z
+
+  if(is.na(Cut_CoinFinds$cf_excavation_start[index])) {
+    next
+  }
+  if(is.na(Cut_CoinFinds$cf_excavation_end[index])) {
+    next
+  }
+  
+  #start year
   point_ID = Cut_CoinFinds$ID[index]
-  point_coins = Cut_CoinFinds$cf_excavation_start[index]
+  excav_start = Cut_CoinFinds$cf_excavation_start[index]
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
- # numCoinsList = ID_toget_numCoins(rad.IDs) Nee func for excav start year
+  excav_start_list = ID_toget_start(rad.IDs) 
   
   #end year
-  point_ID = Cut_CoinFinds$ID[index]
-  point_coins = Cut_CoinFinds$cf_excavation_end[index]
+  excav_end = Cut_CoinFinds$cf_excavation_end[index]
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
- # numCoinsList = ID_toget_numCoins(rad.IDs) Nee func for excav end year
+  excav_end_list = ID_toget_end(rad.IDs) 
 
 
   are.excav.start.same = rep(NULL, length(numCoinsList))
   are.excav.end.same = rep(NULL, length(numCoinsList))
-  for (o in c(1:length(numCoinsList))) {
+  for (o in c(1:length(excav_end_list))) {
     
-
-    #edit this part
     # testing if start year same within range
-    if (numCoinsList[o] <= (point_coins+RANGE) & 
-        numCoinsList[o] >= (point_coins-RANGE)){
-      are.num.coins.same[o] = TRUE
+     if (is.na(excav_start_list[o])) {
+      are.num.coins.same[o] = NA
+      next}
+    if (excav_start_list[o] <= (excav_start+START_RANGE) & 
+        excav_start_list[o] >= (excav_start-START_RANGE)){
+      are.excav.start.same[o] = TRUE
     } else {
-      are.num.coins.same[o] = FALSE  }
+      are.excav.start.same[o] = FALSE  }
     
     # testing if end year same within range
-    if (numCoinsList[o] <= (point_coins+RANGE) & 
-        numCoinsList[o] >= (point_coins-RANGE)){
-      are.num.coins.same[o] = TRUE
+     if (is.na(excav_end_list[o])) {
+      are.excav.end.same[o] = NA
+      next}
+    if (excav_end_list[o] <= (excav_end+END_RANGE) & 
+        excav_end_list[o] >= (excav_end-END_RANGE)){
+      are.excav.end.same[o] = TRUE
     } else {
-      are.num.coins.same[o] = FALSE  }
+      are.excav.end.same[o] = FALSE  }
     
     }
 
-  Cut_CoinFinds$are.num.coins.same[index] = I(list(are.num.coins.same))
+  Cut_CoinFinds$are.excav.start.same[index] = I(list(are.excav.start.same))
+  Cut_CoinFinds$are.excav.end.same[index] = I(list(are.excav.end.same))
 
-  # END
+}
 
 ```
 
+Why are some excavation boundaries still put in even though excavation is listed as false. 
+
+Excavation years themselves are NAs. 
+
+if hoard is NA, skip to the next step
+
+Date Range  DONE
+```{r}
+####INPUT####
+EARLY_DATE = 3
+LATE_DATE = 3
+#############
+
+# screening out NAs
+for (z in c(1:30)) {
+  index = z
+
+  if(is.na(Cut_CoinFinds$cf_start_year[index])) {
+    next
+  }
+  if(is.na(Cut_CoinFinds$cf_end_year[index])) {
+    next
+  }
+  
+  #start year
+  point_ID = Cut_CoinFinds$ID[index]
+  start_year = Cut_CoinFinds$cf_start_year[index]
+  rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
+  start_year_list = ID_toget_startyear(rad.IDs) 
+  
+  #end year
+  end_year = Cut_CoinFinds$cf_end_year[index]
+  rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
+  end_year_list = ID_toget_endyear(rad.IDs)
 
 
+  is.cf.start.year.same = rep(NULL, length(numCoinsList))
+  is.cf.end.year.same = rep(NULL, length(numCoinsList))
+  for (o in c(1:length(end_year_list))) {
+    
+    # testing if start year same within range
+     if (is.na(start_year_list[o])) {
+      is.cf.start.year.same[o] = NA
+      next}
+    if (start_year_list[o] <= (start_year+EARLY_DATE) & 
+        start_year_list[o] >= (start_year-EARLY_DATE)){
+      is.cf.start.year.same[o] = TRUE
+    } else {
+      is.cf.start.year.same[o] = FALSE  }
+    
+    # testing if end year same within range
+     if (is.na(end_year_list[o])) {
+      is.cf.end.year.same[o] = NA
+      next}
+    if (end_year_list[o] <= (end_year+LATE_DATE) & 
+        end_year_list[o] >= (end_year-LATE_DATE)){
+      is.cf.end.year.same[o] = TRUE
+    } else {
+      is.cf.end.year.same[o] = FALSE  }
+    
+    }
+
+  Cut_CoinFinds$is.cf.start.year.same[index] = I(list(is.cf.start.year.same))
+  Cut_CoinFinds$is.cf.end.year.same[index] = I(list(is.cf.end.year.same))
+
+}
 
 
-
-
-
+```
 
 
 
