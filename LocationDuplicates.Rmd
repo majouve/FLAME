@@ -13,97 +13,50 @@ library(janitor)
 library(tidyr)
 library(tidyverse)
 library(sf)
-
+library(readxl)
 ```
 
 Read in Data
 ```{r}
 CoinFinds = read.csv("CoinData/CoinFinds.csv")
 CoinGroups = read.csv("CoinData/CoinGroups.csv")
+Coin_Info = read_excel("CoinData/Coin_Info.xlsx", sheet="Denominations")
+
+Coin_Info$Metal = str_extract(Coin_Info$Name,"(\\w+)")
+Coin_Info$Name = gsub("(Gold)","",as.character(Coin_Info$Name))
+Coin_Info$Name = gsub("(Silver)","",as.character(Coin_Info$Name))
+Coin_Info$Name = gsub("(Bronze)","",as.character(Coin_Info$Name))
+Coin_Info$Name = gsub("(Lead)","",as.character(Coin_Info$Name))
+Coin_Info$Name = substring(Coin_Info$Name, 4)
 ```
 
-*** Testing
-Check for NAs - none for lat and longitude
+### What has been dropped
+Coin groups where metal is NA
+
+Coin Finds coins = NA or 0
+Coin Groups coins = NA or 0
+
+
+**PREP
+Creating a metal column in the CoinGroups dataframe and stripping those that have NA metal 
 ```{r}
-colSums(is.na(CoinFinds))
+
+CoinGroups$metal = NA
+for (n in c(1:nrow(CoinGroups))) {
+  denom_list = c(Coin_Info[['Name']])
+  denom_index = match(CoinGroups$DenominationName[n],denom_list, nomatch = 0)
+  
+  if(denom_index == 0) {
+    next
+    
+  } else {
+    metal = Coin_Info$Metal[denom_index]
+    CoinGroups$metal[n] = metal
+  }
+  
+}
+table(is.na(CoinGroups$metal))
 ```
-
-This code creates the data frame "ClosestNeighbor.CF", which puts the information of the closet geographical neighbor by lattitude and longitude on the same line. The neighboring data's headings have "n." added to them. 
-
-The code is currently set for distance to be in km. Switching which d is used in the code below can change it to degrees.
-```{r}
-# library(rgeos)
-# library(sp)
-# library(geosphere)
-# 
-# GEO_cf = CoinFinds
-# coordinates(GEO_cf) = ~cf_custom_y_coordinate+cf_custom_x_coordinate
-# 
-# #d = gDistance(GEO_cf, byid=T) # distance in km
-# d = distm(GEO_cf) # distance in degrees
-# 
-# min.d <- apply(d, 1, function(x) order(x, decreasing=F)[2])
-# 
-# ClosestN.CF <- cbind(CoinFinds, CoinFinds[min.d,], apply(d, 1, function(x) sort(x, decreasing=F)[2]))
-# 
-# colnames(ClosestN.CF) <- c(colnames(CoinFinds), "n.ID", "n.cf_name", "n.cf_place_name", "n.cf_custom_place_name", "n.cf_custom_x_coordinate", "n.cf_custom_y_coordinate", "n.cf_custom_region", "n.cf_custom_region_vague", "n.cf_excavation_name", "n.cf_excavation", "n.cf_excavation_start", "n.cf_excavation_end", "n.cf_single_find", "n.cf_hoard", "n.cf_start_year", "n.cf_end_year", "n.cf_vague", "n.cf_num_coins_found", "n.cf_publication_ref", "n.cf_user", "n.cf_comment", "n.cf_date_entered", "n.Coin.Find.Search", "n.Coin.Find.Json", "n.Exported.at", "distance")
-# 
-# #Ordering ClosestN.CF by distance
-# 
-```
-
-Isolating those that have a distance from each other equal to zero
-```{r}
-# #Ordering ClosestN.CF by distance
-# #ClosestN.CF = ClosestN.CF[order(ClosestN.CF$distance),]
-# 
-# ClosestEqualsZero = ClosestN.CF[ClosestN.CF$distance==0,]
-# 
-# ClosestEqualsOther = ClosestN.CF[ClosestN.CF$distance>0,]
-# 
-# OverviewOfEqualZero = data.frame(
-#   
-#   ID = ClosestEqualsZero$ID,
-#   CF = ClosestEqualsZero$cf_name,
-#   
-#   Neighbor_ID = ClosestEqualsZero$n.ID,
-#   Neighboring_CF = ClosestEqualsZero$n.cf_name,
-#   
-#   Latitude = ClosestEqualsZero$cf_custom_x_coordinate,
-#   Longitude = ClosestEqualsZero$cf_custom_y_coordinate,
-#   Neighbor_Latitude = ClosestEqualsZero$n.cf_custom_x_coordinate,
-#   Neighbor_Longitude = ClosestEqualsZero$n.cf_custom_y_coordinate,
-#   
-#   distance = ClosestEqualsZero$distance
-# 
-# )
-# 
-# 
-# OverviewEqualsOther = data.frame(
-#   
-#   ID = ClosestEqualsOther$ID,
-#   CF = ClosestEqualsOther$cf_name,
-#   
-#   Neighbor_ID = ClosestEqualsOther$n.ID,
-#   Neighboring_CF = ClosestEqualsOther$n.cf_name,
-#   
-#   Latitude = ClosestEqualsOther$cf_custom_x_coordinate,
-#   Longitude = ClosestEqualsOther$cf_custom_y_coordinate,
-#   Neighbor_Latitude = ClosestEqualsOther$n.cf_custom_x_coordinate,
-#   Neighbor_Longitude = ClosestEqualsOther$n.cf_custom_y_coordinate,
-#   
-#   distance = ClosestEqualsOther$distance
-# 
-# )
-# 
-# 
-# # I've noticed that for some points, it will list the closet value to it as itself. These points only seem to be those that are already listed as the closest to another point. So I think it's fine if I strip them out?
-# 
-# # This works for now as a preliminary solution, but I will definetly want to check to see if this correct. 
-# # For now, I am stripping out ones that repeat 
-
-```
-*****
 
 Functions
 ```{r}
@@ -173,30 +126,38 @@ CF_to_CG = function(cf_IDs) {
 
 ```
 
-
-# Initial Changing of CoinFinds (QUESTION)
+[FINISH] Filling in NAs in cf_num_coins_found with amounts in CoinGroups
+If cf_num_coins_found==NA or 0 still after this reformatting, it gets struck
 ```{r}
 
 for( i in c(1:nrow(CoinFinds))) {
   
   # using CoinGroups to replace NA values in cf_num_coins_found
   # issue with this, some of the coins in the coin groups are also listed as NA
+  #### 10019 still NA because its NA in Coin Groups file, so it was struck
    if(is.na(CoinFinds$cf_num_coins_found[i])) {
      
     CGs = CoinGroups[CoinGroups$cfID==CoinFinds$ID[i],]
-    print(CoinFinds$ID[i])
     Sum = sum(CGs$cg_num_coins)
     CoinFinds$cf_num_coins_found[i] = Sum
      
    }
   
+   if(is.na(CoinFinds$cf_num_coins_found[i])){
+     CoinFinds[-i,]
+   }
+  
 }
 
-#### 10019 still NA because its NA in Coin Groups file.
-# taking out rows where cf_num_coins_found is equal to 0
-#CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found != 0 & !is.na(CoinFinds$cf_num_coins_found),]
 
+# taking out rows where cf_num_coins_found is equal to 0 and cg_num_coins_found
+CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found != 0 & !is.na(CoinFinds$cf_num_coins_found),]
+
+CoinGroups = CoinGroups[CoinGroups$cg_num_coins != 0 & !is.na(CoinGroups$cg_num_coins),]
+CoinGroups = CoinGroups %>% drop_na(metal)
 ```
+**PREP
+
 
 Location Filter: For each coin find location, return all coin finds within a certain radius in a list, forming a column of the dataframe CoinFinds (DONE)
 ```{r}
@@ -204,7 +165,7 @@ Location Filter: For each coin find location, return all coin finds within a cer
 RADIUS = 1000
 ##############
 
-cf_nrow = nrow(CoinFinds) - 2000
+cf_nrow = nrow(CoinFinds) - 1000
 CoinFinds$in.radius = NA
 CoinFinds$num.in.radius = NA
 
@@ -246,11 +207,11 @@ Cut_CoinFinds = CoinFinds
 
 ```
 
-Quantity Filter (DONE)
+Quantity Filter 
 ```{r}
 
 #cutting it at where the previous for loop stopped
-Cut_CoinFinds = Cut_CoinFinds[1:3084,]
+Cut_CoinFinds = Cut_CoinFinds[1:cf_nrow,]
 
 ####INPUT#### 
 RANGE = 5
@@ -288,56 +249,110 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
 
 NOTES
 
-Metal Filter
+[FINISH] Metal Filter
 ```{r}
 
-####INPUT#### 
-RANGE = 5
+####INPUT#### for each group of a specific metal, 
+RANGE = 1
 #############
 
-for (z in c(1:nrow(Cut_CoinFinds))) {
+for (z in c(1:cf_nrow)) {
   index = z
   
+  # radius ID info
   point_ID = Cut_CoinFinds$ID[index]
-  point_cgIDs = CF_to_CG(point_ID)
+  point_CGs = CoinGroups[CoinGroups$cfID==point_ID,]
+  
+  point_silver = sum(point_CGs$cg_num_coins[point_CGs$metal=="Silver"])
+  point_num_silver = length(point_CGs$cg_num_coins[point_CGs$metal=="Silver"])
+  
+  point_gold = sum(point_CGs$cg_num_coins[point_CGs$metal=="Gold"])
+  point_num_gold = length(point_CGs$cg_num_coins[point_CGs$metal=="Gold"])
+  
+  point_bronze = sum(point_CGs$cg_num_coins[point_CGs$metal=="Bronze"])
+  point_num_bronze = length(point_CGs$cg_num_coins[point_CGs$metal=="Bronze"])
+  
+  point_lead = sum(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
+  point_num_lead = length(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
   # need to find metals for the point as well.
   
+  #get radius IDs
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
   
-  CoinGroups$which.metals.are.same = NA
-#  rad.IDS = list(rad.IDs)
-  
+  CoinGroups$is.silver.same = NA
+  CoinGroups$is.gold.same = NA
+  CoinGroups$is.bronze.same = NA
+  CoinGroups$is.lead.same = NA
   # For each coin find within the main point's radius, which have the same amounts of the same metals (And which metals are the same; create a metal.radius.same column?)?
+  
   for (o in c(1:length(rad.IDs))) {
     
-    CGs = CoinGroups[CoinGroups$cfID==rad.IDs[o],]
+    rad_CGs = CoinGroups[CoinGroups$cfID==rad.IDs[o],]
+  
+    rad_silver = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Silver"])
+    point_num_silver = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Silver"])
     
-    # How do I figure out how to find the metal of each coin type?
-          # Write a function? or find a way to export it?
+    rad_gold = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Gold"])
+    point_num_gold = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Gold"])
     
-    # Once you get a list of which metals correspond to which coin amount, 
-    # then you can subset it by each type of denomination
-    # so you will get silver, gold, and bronze variables
+    rad_bronze = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Bronze"])
+    point_num_bronze = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Bronze"])
     
-    
-    # CHANGE Final if statements to get into comparing amounts
+    rad_lead = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Lead"])
+    point_num_lead = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Lead"])
 
+    is.silver.same = rep(NULL, length(rad.IDs))
+    is.gold.same = rep(NULL, length(rad.IDs))
+    is.bronze.same = rep(NULL, length(rad.IDs))
+    is.lead.same = rep(NULL, length(rad.IDs))
     
-  #Add to Cut_CoinFinds
- # Cut_CoinFinds$are.num.coins.same[index] = I(list(are.num.coins.same))
-
-}
-
+    # gold
+    if((rad_gold <= (point_gold + RANGE) & 
+        rad_gold >= (point_gold - RANGE))) {
+      is.gold.same[o] = TRUE
+    } else {
+      is.gold.same[o] = FALSE
+    }
+    
+    # silver 
+    if((rad_silver <= (point_silver + RANGE) & 
+        rad_silver >= (point_silver - RANGE))) {
+      is.silver.same[o] = TRUE
+    } else {
+      is.silver.same[o] = FALSE
+    }
+    
+    # bronze 
+    if((rad_bronze <= (point_bronze + RANGE) & 
+        rad_bronze >= (point_bronze - RANGE))) {
+      is.bronze.same[o] = TRUE
+    } else {
+      is.bronze.same[o] = FALSE
+    }
+    
+    # lead 
+    if((rad_lead <= (point_lead + RANGE) & 
+        rad_lead >= (point_lead - RANGE))) {
+        is.lead.same[o] = TRUE
+    } else {
+      is.lead.same[o] = FALSE
+    }
+  }
+  
+  Cut_CoinFinds$is.silver.same[index] = I(list(is.silver.same))
+  Cut_CoinFinds$is.gold.same[index] = I(list(is.gold.same))
+  Cut_CoinFinds$is.bronze.same[index] = I(list(is.bronze.same))
+  Cut_CoinFinds$is.lead.same[index] = I(list(is.lead.same))
 }
 
 ```
-Questions
 
-Excavation Year Filter (DONE)
+
+Excavation Year Filter 
 ```{r}
 ####INPUT####
-START_RANGE = 3
-END_RANGE = 3
+START_RANGE = 2
+END_RANGE = 2
 #############
 
 for (z in c(1:nrow(Cut_CoinFinds))) {
@@ -401,15 +416,15 @@ Excavation years themselves are NAs.
 
 if hoard is NA, skip to the next step
 
-Date Range  DONE
+Date Range
 ```{r}
 ####INPUT####
-EARLY_DATE = 3
-LATE_DATE = 3
+EARLY_DATE = 10
+LATE_DATE = 10
 #############
 
 # screening out NAs
-for (z in c(1:30)) {
+for (z in c(1:nrow(Cut_CoinFinds))) {
   index = z
 
   if(is.na(Cut_CoinFinds$cf_start_year[index])) {
@@ -465,6 +480,7 @@ for (z in c(1:30)) {
 
 ```
 
+Data presentation in the end: 
 
 
 
