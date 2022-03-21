@@ -3,9 +3,6 @@ title: "LocationDuplicates"
 output: html_document
 ---
 
-lat = x 
-long = y
-
 ```{r}
 library(dplyr)
 library(ggplot2)
@@ -14,14 +11,24 @@ library(tidyr)
 library(tidyverse)
 library(sf)
 library(readxl)
+library(writexl)
 ```
 
-Read in Data
+Read in Data (Download Date: )
 ```{r}
-CoinFinds = read.csv("CoinData/CoinFinds.csv")
-CoinGroups = read.csv("CoinData/CoinGroups.csv")
-Coin_Info = read_excel("CoinData/Coin_Info.xlsx", sheet="Denominations")
+CoinFinds = read.csv("CoinFinds.csv")
+CoinGroups = read.csv("CoinGroups.csv")
+Coin_Info = read_excel("Coin_info.xlsx", sheet="Denominations")
 
+# # Disconsidered Coin Find excel sheet labeled Not_A_Duplicate.xlsx
+# disconsidered = read.csv("Not_A_Duplicate.xlsx")
+# CoinFinds = CoinFinds[CoinFinds$ID %!in% disconsidered$ID, ]
+
+```
+
+Coin_Info has the information about which metal corresponds to each denomination. 
+Here, I am formatting it so I can use it in the next section. 
+```{r}
 Coin_Info$Metal = str_extract(Coin_Info$Name,"(\\w+)")
 Coin_Info$Name = gsub("(Gold)","",as.character(Coin_Info$Name))
 Coin_Info$Name = gsub("(Silver)","",as.character(Coin_Info$Name))
@@ -30,22 +37,18 @@ Coin_Info$Name = gsub("(Lead)","",as.character(Coin_Info$Name))
 Coin_Info$Name = substring(Coin_Info$Name, 4)
 ```
 
-### What has been dropped
-Coin groups where metal is NA
-
-Coin Finds coins = NA or 0
-Coin Groups coins = NA or 0
-
-
-**PREP
-Creating a metal column in the CoinGroups dataframe and stripping those that have NA metal 
+Creating a metal column in the CoinGroups dataframe using the information from Coin_Info
 ```{r}
 
 CoinGroups$metal = NA
 for (n in c(1:nrow(CoinGroups))) {
-  denom_list = c(Coin_Info[['Name']])
-  denom_index = match(CoinGroups$DenominationName[n],denom_list, nomatch = 0)
   
+  #finding the index of the denomination in Coin_Info that corresponds with the Coin Group
+  denom_list = c(Coin_Info[['Name']])
+  denom_index = match(CoinGroups$DenominationName[n], denom_list, nomatch = 0)
+  
+  # inputting the metal that corresponds with the denomination of each coin group
+  # skipping if the Coin Group does not have a metal listed
   if(denom_index == 0) {
     next
     
@@ -55,12 +58,11 @@ for (n in c(1:nrow(CoinGroups))) {
   }
   
 }
-table(is.na(CoinGroups$metal))
 ```
 
 Functions
 ```{r}
-# Function for finding excavation start years from IDs
+# Function for finding excavation start years from a list of cfIDs
 ID_toget_start = function(ID) {
   nums_list <- rep(NULL, length(ID))
   for (i in c(1:length(ID))) {
@@ -70,7 +72,7 @@ ID_toget_start = function(ID) {
   return(nums_list)
 }
 
-# Function for finding excavation end years from IDs
+# Function for finding excavation end years from a list of cfIDs
 ID_toget_end = function(ID) {
   nums_list <- rep(NULL, length(ID))
   for (i in c(1:length(ID))) {
@@ -81,7 +83,7 @@ ID_toget_end = function(ID) {
 }
 ##########
 
-# Function for finding start years from IDs
+# Function for finding start years from a list of cfIDs
 ID_toget_startyear = function(ID) {
   nums_list <- rep(NULL, length(ID))
   for (i in c(1:length(ID))) {
@@ -91,7 +93,7 @@ ID_toget_startyear = function(ID) {
   return(nums_list)
 }
 
-# Function for finding start years from IDs
+# Function for finding end years from a list of cfIDs
 ID_toget_endyear = function(ID) {
   nums_list <- rep(NULL, length(ID))
   for (i in c(1:length(ID))) {
@@ -101,7 +103,8 @@ ID_toget_endyear = function(ID) {
   return(nums_list)
 }
 
-# function that will output number of coins found from an coin find ID
+########
+# function that will output the number of coins found from a cfID
 ID_toget_numCoins = function(ID) {
   nums_list <- rep(NULL, length(ID))
   for (i in c(1:length(ID))) {
@@ -113,36 +116,33 @@ ID_toget_numCoins = function(ID) {
 
 # function that will output list of coin group IDs from a coin find ID
 CF_to_CG = function(cf_IDs) {
-  
- # for (i in c(1:length(cf_IDs))) {
-    
   row = CoinGroups[CoinGroups$cfID==cf_IDs,]
   nums_list = row$cgID
-    
-#  }
-  return(nums_list)
   
+  return(nums_list)
 }
+
+
 
 ```
 
-[FINISH] Filling in NAs in cf_num_coins_found with amounts in CoinGroups
-If cf_num_coins_found==NA or 0 still after this reformatting, it gets struck
+Filling in NAs in cf_num_coins_found with amounts in CoinGroups dataframe (though some coin amounts in CoinGroups are also NA).
+A few categories of coin groups and coin finds get struck:
+- If cf_num_coins_found==NA or 0 after this reformatting
+- cg_num_coins_found==NA or 0 still after this reformatting
+- Coin Groups where metal == NA
 ```{r}
 
 for( i in c(1:nrow(CoinFinds))) {
-  
-  # using CoinGroups to replace NA values in cf_num_coins_found
-  # issue with this, some of the coins in the coin groups are also listed as NA
-  #### 10019 still NA because its NA in Coin Groups file, so it was struck
    if(is.na(CoinFinds$cf_num_coins_found[i])) {
      
+    # summing up coin amounts from each coin group in the coin find 
     CGs = CoinGroups[CoinGroups$cfID==CoinFinds$ID[i],]
     Sum = sum(CGs$cg_num_coins)
     CoinFinds$cf_num_coins_found[i] = Sum
-     
    }
   
+  #striking coin finds that still have NA for cf_num_coins_found
    if(is.na(CoinFinds$cf_num_coins_found[i])){
      CoinFinds[-i,]
    }
@@ -153,29 +153,28 @@ for( i in c(1:nrow(CoinFinds))) {
 # taking out rows where cf_num_coins_found is equal to 0 and cg_num_coins_found
 CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found != 0 & !is.na(CoinFinds$cf_num_coins_found),]
 
+# taking out rows where cg_num_coins_found is equal to 0 and cg_num_coins_found
 CoinGroups = CoinGroups[CoinGroups$cg_num_coins != 0 & !is.na(CoinGroups$cg_num_coins),]
+
+# taking out coin groups where metal == 0
 CoinGroups = CoinGroups %>% drop_na(metal)
 ```
-**PREP
 
-
-Location Filter: For each coin find location, return all coin finds within a certain radius in a list, forming a column of the dataframe CoinFinds (DONE)
+Location Filter: For each coin find location, return all coin finds within a certain radius (that you input) in a list, forming a column of CoinFinds
 ```{r}
-#####INPUT####
-RADIUS = 1000
+#####INPUT RADIUS IN KM####
+RADIUS = 1
 ##############
 
-cf_nrow = nrow(CoinFinds) - 1000
+cf_nrow = nrow(CoinFinds) 
 CoinFinds$in.radius = NA
 CoinFinds$num.in.radius = NA
 
-### Using the sf package, creating spatial objects out of each coin find's lat and long points
+# Using the sf package, creating spatial objects out of each coin find's lat and long points
 longitude_list = CoinFinds$cf_custom_y_coordinate
 latitude_list = CoinFinds$cf_custom_x_coordinate
 IDs_list = CoinFinds$ID
-# target point
 target <- data_frame(ID = IDs_list, longitude = longitude_list, latitude = latitude_list)
-# Specify the source of lat and long coordinates
 target_sf <- st_as_sf(target, coords = c("longitude", "latitude"))
 st_crs(target_sf) <- 4326
 
@@ -188,7 +187,7 @@ for (i in c(1:cf_nrow)) {
   point_sf <- st_as_sf(point, coords = c("mylon", "mylat"))
   st_crs(point_sf) <- 4326
   
-  #  filter records within the RADIUS specified (THE SECTION THAT SLOWS DOWN FOR-LOOP)
+  #  filter records within the RADIUS specified
   target_sf2 <- target_sf %>%
     mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
     filter(Dist <= RADIUS)
@@ -201,17 +200,14 @@ for (i in c(1:cf_nrow)) {
 }
 
 
-# filtering on points that only have themselves as closest point. Going forward, this is the data frame that will entries struck from it if they are not of interest. In the end, it will contain only finds that need attention.
-# Ok on second though, I may just carry through with the whole Data Frame and make cuts at the end
+# Originally, I was going to take coin finds out that had no other finds in their radius but I decided not to. 
+# But I already ended up using Cut_CoinFinds as a variable name below, so I just keep it here. 
 Cut_CoinFinds = CoinFinds
 
 ```
 
-Quantity Filter 
+Quantity Filter: compares cf_num_coins_found between the central point and the radius points. Creates a column of TRUE/FALSES in Cut_CoinFinds indicating whether the radius point is the same or different (within a range you input) from the central point. 
 ```{r}
-
-#cutting it at where the previous for loop stopped
-Cut_CoinFinds = Cut_CoinFinds[1:cf_nrow,]
 
 ####INPUT#### 
 RANGE = 5
@@ -219,50 +215,69 @@ RANGE = 5
 
 
 # This creates another row in Cut_CoinFinds that returns a list of TRUE/FALSE for each coin find in the radius. TRUE: the number of coins found for a coin find are equal to (+/- a range set by user) the total coins found for the central coin find. FALSE: not the same within a certain range set by user
-for (z in c(1:nrow(Cut_CoinFinds))) {
+for (z in c(1:30)) {
+  
+  #finding the number of coins found for the central coin find and the radius coin finds
   index = z
   point_ID = Cut_CoinFinds$ID[index]
   point_coins = Cut_CoinFinds$cf_num_coins_found[index]
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
   numCoinsList = ID_toget_numCoins(rad.IDs)
   
+  # creating a TRUE/FALSE list through testing whether radius coin amounts == central coin amount (within a tolerance)
   are.num.coins.same = rep(NULL, length(numCoinsList))
+  dif.num.coins = rep(NULL, length(numCoinsList))
   for (o in c(1:length(numCoinsList))) {
     
     if (is.na(numCoinsList[o])) {
       are.num.coins.same[o] = NA
+      dif.num.coins[o] = NA
       next
     }
     
     if (numCoinsList[o] <= (point_coins+RANGE) & 
         numCoinsList[o] >= (point_coins-RANGE)){
       are.num.coins.same[o] = TRUE
+      dif.num.coins[o] = point_coins - numCoinsList[o]
+      
     } else {
-      are.num.coins.same[o] = FALSE  }}
+      are.num.coins.same[o] = FALSE
+      dif.num.coins[o] = NA
+      dif.num.coins[o] = point_coins - numCoinsList[o] }}
 
+  # add TRUE/FALSE list to Cut_CoinFinds
   Cut_CoinFinds$are.num.coins.same[index] = I(list(are.num.coins.same))
-
+  Cut_CoinFinds$dif.num.coins[index] = I(list(dif.num.coins))
 }
 
 
 ```
 
-NOTES
-
-[FINISH] Metal Filter
+Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of total amounts of each metal within a coin find. 
 ```{r}
 
-####INPUT#### for each group of a specific metal, 
-RANGE = 1
-#############
+# creating columns for each metal type in Cut_CoinFinds
+Cut_CoinFinds$is.silver.same = NA
+Cut_CoinFinds$dif.silver = NA
+
+Cut_CoinFinds$is.gold.same = NA
+Cut_CoinFinds$dif.gold = NA
+
+Cut_CoinFinds$is.bronze.same = NA
+Cut_CoinFinds$dif.bronze = NA
+
+Cut_CoinFinds$is.lead.same = NA
+Cut_CoinFinds$dif.lead = NA
+
 
 for (z in c(1:cf_nrow)) {
   index = z
   
-  # radius ID info
+  # get the cgIDs corresponding to central cf
   point_ID = Cut_CoinFinds$ID[index]
   point_CGs = CoinGroups[CoinGroups$cfID==point_ID,]
   
+  #sum up amount of coins of each metal for a coin find
   point_silver = sum(point_CGs$cg_num_coins[point_CGs$metal=="Silver"])
   point_num_silver = length(point_CGs$cg_num_coins[point_CGs$metal=="Silver"])
   
@@ -274,86 +289,100 @@ for (z in c(1:cf_nrow)) {
   
   point_lead = sum(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
   point_num_lead = length(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
-  # need to find metals for the point as well.
+ 
   
   #get radius IDs
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
   
-  CoinGroups$is.silver.same = NA
-  CoinGroups$is.gold.same = NA
-  CoinGroups$is.bronze.same = NA
-  CoinGroups$is.lead.same = NA
-  # For each coin find within the main point's radius, which have the same amounts of the same metals (And which metals are the same; create a metal.radius.same column?)?
+  # create empty lists which will be filled in for loop
+  is.silver.same = rep(NULL, length(rad.IDs))
+  is.gold.same = rep(NULL, length(rad.IDs))
+  is.bronze.same = rep(NULL, length(rad.IDs))
+  is.lead.same = rep(NULL, length(rad.IDs))  
   
+  dif.lead = rep(NULL, length(rad.IDs)) 
+  dif.silver = rep(NULL, length(rad.IDs)) 
+  dif.gold = rep(NULL, length(rad.IDs)) 
+  dif.bronze = rep(NULL, length(rad.IDs)) 
+  
+  # loops through each cf in the radius of the central cf. 
+  # Compares amount of each metal in cf between the central and radius points
+  # outputs TRUE/FALSE lists and total amounts of each metal in a coin find
   for (o in c(1:length(rad.IDs))) {
     
+    # coin groups for each radius point
     rad_CGs = CoinGroups[CoinGroups$cfID==rad.IDs[o],]
   
+    # summing up amount of each metal in cf
     rad_silver = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Silver"])
-    point_num_silver = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Silver"])
     
     rad_gold = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Gold"])
-    point_num_gold = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Gold"])
     
     rad_bronze = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Bronze"])
-    point_num_bronze = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Bronze"])
     
     rad_lead = sum(rad_CGs$cg_num_coins[rad_CGs$metal=="Lead"])
-    point_num_lead = length(rad_CGs$cg_num_coins[rad_CGs$metal=="Lead"])
 
-    is.silver.same = rep(NULL, length(rad.IDs))
-    is.gold.same = rep(NULL, length(rad.IDs))
-    is.bronze.same = rep(NULL, length(rad.IDs))
-    is.lead.same = rep(NULL, length(rad.IDs))
+    #save total metal amounts
     
-    # gold
-    if((rad_gold <= (point_gold + RANGE) & 
-        rad_gold >= (point_gold - RANGE))) {
+    dif.gold[o] = point_gold - rad_gold
+    dif.silver[o] = point_silver - rad_silver
+    dif.bronze[o] = point_bronze - rad_bronze
+    dif.lead[o] = point_lead - rad_lead
+    
+    # comparing amount of gold
+    if((rad_gold <= (point_gold + point_num_gold) & 
+        rad_gold >= (point_gold - point_num_gold))) {
       is.gold.same[o] = TRUE
+      
     } else {
-      is.gold.same[o] = FALSE
-    }
+      is.gold.same[o] = FALSE }
     
     # silver 
-    if((rad_silver <= (point_silver + RANGE) & 
-        rad_silver >= (point_silver - RANGE))) {
+    if((rad_silver <= (point_silver + point_num_silver) & 
+        rad_silver >= (point_silver - point_num_silver))) {
       is.silver.same[o] = TRUE
+      
     } else {
-      is.silver.same[o] = FALSE
-    }
+      is.silver.same[o] = FALSE}
     
     # bronze 
-    if((rad_bronze <= (point_bronze + RANGE) & 
-        rad_bronze >= (point_bronze - RANGE))) {
+    if((rad_bronze <= (point_bronze + point_num_bronze) & 
+        rad_bronze >= (point_bronze - point_num_bronze))) {
       is.bronze.same[o] = TRUE
     } else {
-      is.bronze.same[o] = FALSE
-    }
+      is.bronze.same[o] = FALSE  }
     
     # lead 
-    if((rad_lead <= (point_lead + RANGE) & 
-        rad_lead >= (point_lead - RANGE))) {
+    if((rad_lead <= (point_lead + point_num_lead) & 
+        rad_lead >= (point_lead - point_num_lead))) {
         is.lead.same[o] = TRUE
     } else {
-      is.lead.same[o] = FALSE
-    }
+      is.lead.same[o] = FALSE }
   }
   
+  # add lists to Cut_CoinFinds
   Cut_CoinFinds$is.silver.same[index] = I(list(is.silver.same))
   Cut_CoinFinds$is.gold.same[index] = I(list(is.gold.same))
   Cut_CoinFinds$is.bronze.same[index] = I(list(is.bronze.same))
   Cut_CoinFinds$is.lead.same[index] = I(list(is.lead.same))
+  
+  Cut_CoinFinds$dif.silver[index] = I(list(dif.silver))
+  Cut_CoinFinds$dif.gold[index] = I(list(dif.gold))
+  Cut_CoinFinds$dif.bronze[index] = I(list(dif.bronze))
+  Cut_CoinFinds$dif.lead[index] = I(list(dif.lead))
 }
 
 ```
 
-
-Excavation Year Filter 
+Excavation Year Filter: does the same comparison but with cf_excavation_start and cf_excavation_end
 ```{r}
 ####INPUT####
 START_RANGE = 2
 END_RANGE = 2
 #############
+
+Cut_CoinFinds$are.excav.start.same = NA
+Cut_CoinFinds$are.excav.end.same = NA
 
 for (z in c(1:nrow(Cut_CoinFinds))) {
   index = z
@@ -376,7 +405,6 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
   excav_end_list = ID_toget_end(rad.IDs) 
 
-
   are.excav.start.same = rep(NULL, length(numCoinsList))
   are.excav.end.same = rep(NULL, length(numCoinsList))
   for (o in c(1:length(excav_end_list))) {
@@ -384,21 +412,19 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
     # testing if start year same within range
      if (is.na(excav_start_list[o])) {
       are.num.coins.same[o] = NA
-      next}
-    if (excav_start_list[o] <= (excav_start+START_RANGE) & 
-        excav_start_list[o] >= (excav_start-START_RANGE)){
-      are.excav.start.same[o] = TRUE
-    } else {
+      }
+    else if (excav_start_list[o] <= (excav_start+START_RANGE) & excav_start_list[o] >= (excav_start-START_RANGE)) {
+      are.excav.start.same[o] = TRUE } 
+    else {
       are.excav.start.same[o] = FALSE  }
     
     # testing if end year same within range
      if (is.na(excav_end_list[o])) {
       are.excav.end.same[o] = NA
-      next}
-    if (excav_end_list[o] <= (excav_end+END_RANGE) & 
-        excav_end_list[o] >= (excav_end-END_RANGE)){
-      are.excav.end.same[o] = TRUE
-    } else {
+      }
+    else if (excav_end_list[o] <= (excav_end+END_RANGE) &  excav_end_list[o] >= (excav_end-END_RANGE)) {
+      are.excav.end.same[o] = TRUE} 
+    else {
       are.excav.end.same[o] = FALSE  }
     
     }
@@ -410,18 +436,17 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
 
 ```
 
-Why are some excavation boundaries still put in even though excavation is listed as false. 
-
-Excavation years themselves are NAs. 
-
-if hoard is NA, skip to the next step
-
-Date Range
+Date Range: does the same comparison but with cf_start_year and cf_end_year
 ```{r}
 ####INPUT####
-EARLY_DATE = 10
-LATE_DATE = 10
+EARLY_DATE = 25
+LATE_DATE = 25
 #############
+
+Cut_CoinFinds$is.cf.start.year.same = NA
+Cut_CoinFinds$is.cf.end.year.same = NA
+Cut_CoinFinds$start.date.dif = NA
+Cut_CoinFinds$end.date.dif = NA
 
 # screening out NAs
 for (z in c(1:nrow(Cut_CoinFinds))) {
@@ -448,39 +473,365 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
 
   is.cf.start.year.same = rep(NULL, length(numCoinsList))
   is.cf.end.year.same = rep(NULL, length(numCoinsList))
+  start.date.dif = rep(NULL, length(numCoinsList))
+  end.date.dif = rep(NULL, length(numCoinsList))
+  
   for (o in c(1:length(end_year_list))) {
     
     # testing if start year same within range
-     if (is.na(start_year_list[o])) {
-      is.cf.start.year.same[o] = NA
-      next}
-    if (start_year_list[o] <= (start_year+EARLY_DATE) & 
-        start_year_list[o] >= (start_year-EARLY_DATE)){
+    if (is.na(start_year_list[o])) {
+      is.cf.start.year.same[o] = NA 
+      start.date.dif[o] = NA
+      
+    }else if (start_year_list[o] <= (start_year+EARLY_DATE) & start_year_list[o] >= (start_year-EARLY_DATE)){
       is.cf.start.year.same[o] = TRUE
+      start.date.dif[o] = start_year - start_year_list[o]
     } else {
-      is.cf.start.year.same[o] = FALSE  }
+      is.cf.start.year.same[o] = FALSE
+      start.date.dif[o] = start_year - start_year_list[o]}
     
     # testing if end year same within range
      if (is.na(end_year_list[o])) {
       is.cf.end.year.same[o] = NA
-      next}
-    if (end_year_list[o] <= (end_year+LATE_DATE) & 
-        end_year_list[o] >= (end_year-LATE_DATE)){
+      end.date.dif[o] = NA
+      
+    } else if (end_year_list[o] <= (end_year+LATE_DATE) & end_year_list[o] >= (end_year-LATE_DATE)){
       is.cf.end.year.same[o] = TRUE
+      end.date.dif[o] = end_year - end_year_list[o]
+      
     } else {
-      is.cf.end.year.same[o] = FALSE  }
+      is.cf.end.year.same[o] = FALSE 
+      end.date.dif[o] = end_year - end_year_list[o]}
     
     }
 
   Cut_CoinFinds$is.cf.start.year.same[index] = I(list(is.cf.start.year.same))
   Cut_CoinFinds$is.cf.end.year.same[index] = I(list(is.cf.end.year.same))
+  Cut_CoinFinds$start.date.dif[index] = I(list(start.date.dif))
+  Cut_CoinFinds$end.date.dif[index] = I(list(end.date.dif))
+}
 
+
+```
+#########
+
+Cut out finds with no other finds in their radius. 
+```{r}
+# create new dataframe of possible duplicates to test
+TEST_CoinFinds = Cut_CoinFinds
+
+# creating a column that flags whether a central cf has only one cf in its radius
+# (The location filter will place a point within its own radius, so if a cf has only one other cf in its radius, they are the same)
+TEST_CoinFinds$one.in.radius = NA
+for (i in c(1:cf_nrow)) {
+  
+  length = length(TEST_CoinFinds$in.radius[i][[1]])
+  if (length==1) {
+    TEST_CoinFinds$one.in.radius[i] = TRUE
+  }else{
+    TEST_CoinFinds$one.in.radius[i] = FALSE
+  }
+}
+
+# this is the data frame of CFs that can't be duplicates
+disconsidered_CFs = TEST_CoinFinds[TEST_CoinFinds$one.in.radius==TRUE,]
+
+# this is the data fram of coin finds that could be duplicates
+TEST_CoinFinds = TEST_CoinFinds[TEST_CoinFinds$one.in.radius==FALSE,]
+
+```
+
+Create clusterID out of coin find IDs separated by periods that comprise a geographical cluster 
+```{r}
+
+
+TEST_CoinFinds$clusterID = NA
+# creating clusterID and putting it in the main data frame
+for (i in c(1:nrow(TEST_CoinFinds))) {
+  
+  radius_list = TEST_CoinFinds$in.radius[i][[1]]
+  clusterID = paste(radius_list, collapse = ".")
+  
+  TEST_CoinFinds$clusterID[i] = clusterID
 }
 
 
 ```
 
-Data presentation in the end: 
+Create functions that pulls out an inputted cluster from TEST_CoinFinds and splits up the true and false list to a table
+```{r}
+#####Get information on a specific cluster
+cluster_info = function(clusterID) {
+
+  # pulls info of all coins in a cluster and adds clusterID
+ list = as.integer(unlist(strsplit(clusterID, split=".", fixed = T)))
+ cluster =  Cut_CoinFinds[Cut_CoinFinds$ID %in% list,]
+ cluster = subset(cluster, select = -c(cf_place_name,cf_custom_place_name, cf_custom_region, cf_custom_region_vague, cf_vague, cf_comment, cf_date_entered, Exported.at, cf_publication_ref, cf_user, Coin.Find.Json, in.radius) )
+ cluster$clusterID = c(rep(clusterID, rep=nrow(cluster)))
+ 
+ #beginning to reformat the TRUE/FALSE lists
+ ref_are.num.coins.same = unlist(cluster$are.num.coins.same[1])
+ 
+ ref_is.silver.same = unlist(cluster$is.silver.same[1])
+ ref_is.gold.same = unlist(cluster$is.gold.same[1])
+ ref_is.bronze.same = unlist(cluster$is.bronze.same[1])
+ ref_is.lead.same = unlist(cluster$is.lead.same[1])
+ ref_total.silver = unlist(cluster$total.silver[1])
+ ref_total.gold = unlist(cluster$total.gold[1])
+ ref_total.bronze = unlist(cluster$total.bronze[1])
+ ref_total.lead = unlist(cluster$total.lead[1])
+ 
+ ref_are.excav.start.same = unlist(cluster$are.excav.start.same[1])
+ ref_are.excav.end.same = unlist(cluster$are.excav.end.same[1])
+ 
+ ref_is.cf.start.year.same = unlist(cluster$is.cf.start.year.same[1])
+ ref_is.cf.end.year.same = unlist(cluster$is.cf.end.year.same[1])
+ 
+ #putting TRUE/FALSEs into the cluster data frame
+ for(z in c(1:nrow(cluster))) {
+   
+   cluster$are.num.coins.same[z] = ref_are.num.coins.same[z]
+   
+   cluster$is.silver.same[z] = ref_is.silver.same[z]
+   cluster$is.gold.same[z] = ref_is.gold.same[z]
+   cluster$is.bronze.same[z] = ref_is.bronze.same[z]
+   cluster$is.lead.same[z] = ref_is.lead.same[z]
+   
+   cluster$total.silver[z] = ref_total.silver[z]
+   cluster$total.gold[z] = ref_total.gold[z]
+   cluster$total.bronze[z] = ref_total.bronze[z]
+   cluster$total.lead[z] = ref_total.lead[z]   
+   
+   cluster$are.excav.start.same[z] = ref_are.excav.start.same[z]
+   cluster$are.excav.end.same[z] = ref_are.excav.end.same[z]
+   cluster$is.cf.start.year.same[z] = ref_is.cf.start.year.same[z]
+   cluster$is.cf.end.year.same[z] = ref_is.cf.end.year.same[z]
+   
+ }
+ 
+#reformat dataframe for easier comparison
+col_order <- c("ID", "cf_name", "cf_custom_x_coordinate","cf_custom_y_coordinate",
+               "clusterID", "num.in.radius", 
+               "cf_excavation_start", "are.excav.start.same", "cf_excavation_end", "are.excav.end.same", "cf_excavation_name", "cf_excavation", "cf_single_find", "cf_hoard",
+               "cf_start_year", "is.cf.start.year.same", "cf_end_year", "is.cf.end.year.same",
+               "cf_num_coins_found", "are.num.coins.same",
+               "total.gold", "is.gold.same", "total.silver", "is.silver.same", "total.bronze", "is.bronze.same", "total.lead", "is.lead.same")
+cluster <- cluster[, col_order]
+ 
+return(cluster)
+}
+
+```
+
+FULL_clusters = dataframe with clusterID, cfID of the central cf, name of central coin find
+(This dataframe will have duplicates of clusterIDs)
+```{r}
+FULL_clusters = data.frame(cfID = TEST_CoinFinds$ID, name = TEST_CoinFinds$cf_name, clusterID = TEST_CoinFinds$clusterID)
+FULL_clusters$radius = rep(RADIUS, nrow(FULL_clusters))
+```
+
+
+Adding extra columns to FULL_clusters
+for number of coins, start and end date, and metals I have a column for percent matches in each cluster 
+and the avg of difference between the central coin find and the cluster value for the above attributes
+
+I have added an extra indicator for metals to interpret the date more easily. 
+For many coin finds, there will be no coins of a specific metal. For each metal I have added a boolean 
+value "is.X.zero" that will be TRUE when all coin finds in a cluster have no coins of X metal (FALSE otherwise)
+```{r}
+## Creating extra columns
+FULL_clusters$percent.num.coins.same = NA
+FULL_clusters$avg.coin.num.dif = NA
+
+FULL_clusters$percent.start.date.same = NA
+FULL_clusters$avg.start.date.dif = NA
+
+FULL_clusters$percent.end.date.same = NA
+FULL_clusters$avg.end.date.dif = NA
+
+#metals
+FULL_clusters$percent.silver.same = NA
+FULL_clusters$avg.silver.dif = NA
+FULL_clusters$is.silver.zero = NA
+
+FULL_clusters$percent.gold.same = NA
+FULL_clusters$avg.gold.dif = NA
+FULL_clusters$is.gold.zero = NA
+
+FULL_clusters$percent.bronze.same = NA
+FULL_clusters$avg.bronze.dif = NA
+FULL_clusters$is.bronze.zero = NA
+
+FULL_clusters$percent.lead.same = NA
+FULL_clusters$avg.lead.dif = NA
+FULL_clusters$is.lead.zero = NA
+
+#num coins
+for (i in c(1:nrow(FULL_clusters))) {
+  index = i
+  FULL_id = FULL_clusters$cfID[index]
+  FULL_FULL = Cut_CoinFinds[Cut_CoinFinds$ID == FULL_id,]
+  num.coins = unlist(FULL_FULL$are.num.coins.same[1][1])
+  coin.difs = unlist(FULL_FULL$dif.num.coins[1][1])
+  
+  FULL_clusters$percent.num.coins.same[index] = ((length(num.coins[num.coins==TRUE])-1)/FULL_FULL$num.in.radius)*100
+  
+  FULL_clusters$avg.coin.num.dif[i] = mean(coin.difs)
+}
+
+
+#start date range
+
+for (i in c(1:nrow(FULL_clusters))) {
+  index = i
+  FULL_id = FULL_clusters$cfID[index]
+  FULL_FULL = Cut_CoinFinds[Cut_CoinFinds$ID == FULL_id,]
+  num.starts = unlist(FULL_FULL$is.cf.start.year.same[1][1])
+  start.date.difs = unlist(FULL_FULL$start.date.di[1][1])
+  
+  FULL_clusters$percent.start.date.same[index] = ((length(num.starts[num.starts==TRUE])-1)/FULL_FULL$num.in.radius)*100
+  
+  FULL_clusters$avg.start.date.dif[i] = mean(start.date.difs)
+  
+}
+
+#end date range
+
+for (i in c(1:nrow(FULL_clusters))) {
+  index = i
+  FULL_id = FULL_clusters$cfID[index]
+  FULL_FULL = Cut_CoinFinds[Cut_CoinFinds$ID == FULL_id,]
+  
+  num.ends = unlist(FULL_FULL$is.cf.end.year.same[1][1])
+  end.date.difs = unlist(FULL_FULL$end.date.dif[1][1])
+  
+  FULL_clusters$percent.end.date.same[index] = ((length(num.ends[num.ends==TRUE])-1)/FULL_FULL$num.in.radius)*100
+  FULL_clusters$avg.end.date.dif[i] = mean(end.date.difs)
+}
+
+
+###metals
+
+for (i in c(1:nrow(FULL_clusters))) {
+  index = i
+  FULL_id = FULL_clusters$cfID[index]
+  FULL_FULL = Cut_CoinFinds[Cut_CoinFinds$ID == FULL_id,]
+  
+  num.silver = unlist(FULL_FULL$is.silver.same[1][1])
+  num.gold = unlist(FULL_FULL$is.gold.same[1][1])
+  num.lead = unlist(FULL_FULL$is.lead.same[1][1])
+  num.bronze = unlist(FULL_FULL$is.bronze.same[1][1])
+  
+  silver.difs = unlist(FULL_FULL$dif.silver[1][1])
+  gold.difs = unlist(FULL_FULL$dif.gold[1][1])
+  lead.difs = unlist(FULL_FULL$dif.lead[1][1])
+  bronze.difs = unlist(FULL_FULL$dif.bronze[1][1])
+
+  FULL_clusters$percent.silver.same[index] = (length(num.silver[num.silver==TRUE])/FULL_FULL$num.in.radius)*100
+  FULL_clusters$percent.gold.same[index] = (length(num.gold[num.gold==TRUE])/FULL_FULL$num.in.radius)*100
+  FULL_clusters$percent.bronze.same[index] = (length(num.bronze[num.bronze==TRUE])/FULL_FULL$num.in.radius)*100
+  FULL_clusters$percent.lead.same[index] = (length(num.lead[num.lead==TRUE])/FULL_FULL$num.in.radius)*100
+  
+  FULL_clusters$avg.silver.dif[i] = mean(silver.difs)
+  FULL_clusters$avg.gold.dif[i] = mean(gold.difs)
+  FULL_clusters$avg.bronze.dif[i] = mean(bronze.difs)
+  FULL_clusters$avg.lead.dif[i] = mean(lead.difs)
+  
+  FULL_clusters$is.lead.zero[i] = ifelse(length(unique(lead.difs)) == 1 & unique(lead.difs)[1]==0, TRUE, FALSE)
+  FULL_clusters$is.gold.zero[i] = ifelse(length(unique(gold.difs)) == 1 & unique(gold.difs)[1]==0, TRUE, FALSE)
+  FULL_clusters$is.silver.zero[i] = ifelse(length(unique(silver.difs)) == 1 & unique(silver.difs)[1]==0, TRUE, FALSE)
+  FULL_clusters$is.bronze.zero[i] = ifelse(length(unique(bronze.difs)) == 1 & unique(bronze.difs)[1]==0, TRUE, FALSE)
+}
+
+```
+
+Adding one more column to FULL_clusters:
+column indicating how many attributes of the coin find clusters match up
+```{r}
+FULL_clusters$how.many.matches = NA
+
+for (i in c(1:nrow(FULL_clusters))) {
+  counter = 0
+  
+  if (FULL_clusters$percent.num.coins.same[i] > 0) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.start.date.same[i] > 0) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.end.date.same[i] > 0) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.silver.same[i]>0 & FULL_clusters$is.silver.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.gold.same[i]>0 & FULL_clusters$is.gold.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.lead.same[i]>0 & FULL_clusters$is.lead.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.bronze.same[i]>0 & FULL_clusters$is.bronze.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  FULL_clusters$how.many.matches[i] = counter
+}
+
+
+```
+
+Creating a smaller subset of coin finds more likely to be duplicates
+```{r}
+At_Least_One_Match = FULL_clusters[FULL_clusters$percent.num.coins.same>0 | FULL_clusters$percent.start.date.same>0 | FULL_clusters$percent.end.date.same>0 | (FULL_clusters$percent.bronze.same>0 & FULL_clusters$is.bronze.zero==FALSE) | 
+ (FULL_clusters$percent.silver.same>0 & FULL_clusters$is.silver.zero==FALSE) |
+   (FULL_clusters$percent.gold.same>0 & FULL_clusters$is.gold.zero==FALSE) |
+   (FULL_clusters$percent.lead.same>0 & FULL_clusters$is.lead.zero==FALSE),]
+
+At_Least_Three_Match = At_Least_One_Match[FULL_clusters$how.many.matches>=3,]
+```
+
+
+#############
+OUTPUTS:
+Run to get a spread sheet of coin finds that aren't possible duplicates
+(You will need to change the file path)
+```{r}
+write_xlsx(disconsidered_CFs,"/cloud/project/Not_A_Duplicate.xlsx")
+```
+
+Run to get a list of cluster IDs in a spread sheet with percent overlap between attributes of coin finds
+in each cluster and avg difference (central find - radius find) between attributes
+(You will need to change the file path)
+```{r}
+write_xlsx(FULL_clusters,"/cloud/project/Possible_Duplicates.xlsx")
+```
+
+This is the same as above but only clusters that match on at least one other attribute other than 
+location
+```{r}
+write_xlsx(At_Least_One_Match,"/cloud/project/At_Least_One_Match.xlsx")
+```
+
+
+Input: a cluster ID (change the file path)
+Output: a spread sheet and data frame of the info on a specific cluster
+```{r}
+####INPUT####
+cluster = cluster_info("7920.7921.13298.13299")
+write_xlsx(cluster,"/cloud/project/cluster.xlsx")
+```
+
+
+
+
+
 
 
 
