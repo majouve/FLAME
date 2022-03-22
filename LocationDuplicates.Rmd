@@ -207,6 +207,7 @@ Cut_CoinFinds = CoinFinds
 ```
 
 Quantity Filter: compares cf_num_coins_found between the central point and the radius points. Creates a column of TRUE/FALSES in Cut_CoinFinds indicating whether the radius point is the same or different (within a range you input) from the central point. 
+I also calculate the difference between the amount of coins of the central find and that of each radius find. This forms another column of lists. 
 ```{r}
 
 ####INPUT#### 
@@ -215,7 +216,7 @@ RANGE = 5
 
 
 # This creates another row in Cut_CoinFinds that returns a list of TRUE/FALSE for each coin find in the radius. TRUE: the number of coins found for a coin find are equal to (+/- a range set by user) the total coins found for the central coin find. FALSE: not the same within a certain range set by user
-for (z in c(1:30)) {
+for (z in c(1:cf_nrow)) {
   
   #finding the number of coins found for the central coin find and the radius coin finds
   index = z
@@ -253,7 +254,7 @@ for (z in c(1:30)) {
 
 ```
 
-Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of total amounts of each metal within a coin find. 
+Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of the difference in metal amounts between the central coin find and each radius coin find.
 ```{r}
 
 # creating columns for each metal type in Cut_CoinFinds
