@@ -38,9 +38,28 @@ Not_A_Duplicate.xlsx
 Possible_Duplicates.xlsx
 - this data frame contains all location clusters (length = ~2,300)
 
+cfID = coin find ID of central coin find
+name = name of central coin find
+clusterID = all the IDs of the coin finds in a cluster seperated by periods
+radius = size of radius in km
+percent.num.coins.same = percent of coin finds in a cluster that have the same amount of coins as the central ID (+/- 5)
+avg.coin.num.dif = average(number of coins of central cf - number of coins in each 
+*All other percent and average columns follow the same idea*
+is.gold/bronze/silver.zero = Some of the metals (esp gold and silver) will be absent from many coin finds. This means that coins finds with an equal amount of gold coins, for example, will look the same as coin finds 
+how.many.matches = this counts how many attributes have a percent match > 0
+
+
 At_Least_One_Match.xlsx
 - this data frame contains only location clusters that also match on one other attribute (amount of coins, data range, etc.) (length = ~2,200)
 - the column descriptions from Possible_Duplicates apply here
+
+
+
+
+
+
+
+
 
 
 
