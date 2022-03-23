@@ -826,12 +826,6 @@ location
 write_xlsx(At_Least_One_Match,"/cloud/project/At_Least_One_Match.xlsx")
 ```
 
-This will give you a spreadsheet of the comparisons done on all coin finds
-```{r}
-write_xlsx(Cut_CoinFinds,"/cloud/project/Full_Analysis.xlsx")
-```
-
-
 Input: a cluster ID (change the file path)
 Output: a spread sheet and data frame of the info on a specific cluster
 ```{r}
