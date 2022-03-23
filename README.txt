@@ -26,13 +26,19 @@ Date Range Filter: I break up start and end date for each coin find. Then I comp
 #########
 Output: This program creates four output spread sheets:
 
-Full_Analysis
+Full_Analysis.xlsx
 - I'm supplying this spread sheet to show the comparisons made for each coin find even if they end up being disconsidered in the end. 
 Here is a description of what each column means that I have added to the original data frame inputted:
+*The first half of the columns are what was inputted into the program*
+in.radius = list of the cfIDs that are in a geographical cluster with the central cf
+num.in.radius = lists how many coin finds are in a cluster
+are.X.same  = For each coin find in a cluster, TRUE if the value of a given attribute is the same as the central find (within a tolerance) and FALSE if the value is not the same
+dif.X = This is a list of the differences the central find value for a given attribute - the given attribute for each coin find in the radius
+one.in.radius = TRUE if a coin find has an empty cluster and FALSE otherwise
 
 Not_A_Duplicate.xlsx
 - if coins do not have any others in their cluster by location, then they will be placed in this group
-- the column descriptions from Full_Analysis apply here
+- the column descriptions from Full_Analysis apply here; however, many at the end will be blank because there are no other coins in the cluster to compare to.
 
 
 Possible_Duplicates.xlsx
@@ -45,7 +51,7 @@ radius = size of radius in km
 percent.num.coins.same = percent of coin finds in a cluster that have the same amount of coins as the central ID (+/- 5)
 avg.coin.num.dif = average(number of coins of central cf - number of coins in each 
 *All other percent and average columns follow the same idea*
-is.gold/bronze/silver.zero = Some of the metals (esp gold and silver) will be absent from many coin finds. This means that coins finds with an equal amount of gold coins, for example, will look the same as coin finds 
+is.gold/bronze/silver.zero = Some of the metals (esp gold and silver) will be absent from many coin finds. This means that coins finds with an equal amount of gold coins, for example, will look the same in the spread sheet (percent.gold.same = 0 and avg.gold.dif = 0) as coin finds all with gold zero coins. I added this column that will be TRUE when all coins in a cf cluster have zero of one type of metal and that will be FALSE otherwise. 
 how.many.matches = this counts how many attributes have a percent match > 0
 
 
@@ -53,7 +59,8 @@ At_Least_One_Match.xlsx
 - this data frame contains only location clusters that also match on one other attribute (amount of coins, data range, etc.) (length = ~2,200)
 - the column descriptions from Possible_Duplicates apply here
 
-
+Short_Clusters.xlsx
+- In Possible_Duplicates and At_Leat_One_Match, there is a repeat of clusters in the data frames because many coin finds will be in the same cluster together. Therefore, I created this shorter data frame (~500 entries) that keeps only one of the coin find entries for each cluster. 
 
 
 
