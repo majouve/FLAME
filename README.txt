@@ -26,20 +26,14 @@ Date Range Filter: I break up start and end date for each coin find. Then I comp
 #########
 Output: This program creates four output spread sheets:
 
-Full_Analysis.xlsx
-- I'm supplying this spread sheet to show the comparisons made for each coin find even if they end up being disconsidered in the end. 
-Here is a description of what each column means that I have added to the original data frame inputted:
+Not_A_Duplicate.xlsx
+-all coin finds that have nothing in their cluster
 *The first half of the columns are what was inputted into the program*
 in.radius = list of the cfIDs that are in a geographical cluster with the central cf
 num.in.radius = lists how many coin finds are in a cluster
 are.X.same  = For each coin find in a cluster, TRUE if the value of a given attribute is the same as the central find (within a tolerance) and FALSE if the value is not the same
 dif.X = This is a list of the differences the central find value for a given attribute - the given attribute for each coin find in the radius
 one.in.radius = TRUE if a coin find has an empty cluster and FALSE otherwise
-
-Not_A_Duplicate.xlsx
-- if coins do not have any others in their cluster by location, then they will be placed in this group
-- the column descriptions from Full_Analysis apply here; however, many at the end will be blank because there are no other coins in the cluster to compare to.
-
 
 Possible_Duplicates.xlsx
 - this data frame contains all location clusters (length = ~2,300)
