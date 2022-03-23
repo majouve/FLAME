@@ -814,10 +814,21 @@ in each cluster and avg difference (central find - radius find) between attribut
 write_xlsx(FULL_clusters,"/cloud/project/Possible_Duplicates.xlsx")
 ```
 
+This is a shortened version of this spread sheet that only keeps one of the coin find entries for each cluster.
+```{r}
+nodupes_clusters = FULL_clusters[!duplicated(FULL_clusters$clusterID), ]
+write_xlsx(nodupes_clusters,"/cloud/project/Short_Clusters.xlsx")
+```
+
 This is the same as above but only clusters that match on at least one other attribute other than 
 location
 ```{r}
 write_xlsx(At_Least_One_Match,"/cloud/project/At_Least_One_Match.xlsx")
+```
+
+This will give you a spreadsheet of the comparisons done on all coin finds
+```{r}
+write_xlsx(Cut_CoinFinds,"/cloud/project/Full_Analysis.xlsx")
 ```
 
 
