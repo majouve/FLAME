@@ -131,6 +131,7 @@ A few categories of coin groups and coin finds get struck:
 - If cf_num_coins_found==NA or 0 after this reformatting
 - cg_num_coins_found==NA or 0 still after this reformatting
 - Coin Groups where metal == NA
+-everything with THS in the name
 ```{r}
 
 for( i in c(1:nrow(CoinFinds))) {
@@ -158,6 +159,12 @@ CoinGroups = CoinGroups[CoinGroups$cg_num_coins != 0 & !is.na(CoinGroups$cg_num_
 
 # taking out coin groups where metal == 0
 CoinGroups = CoinGroups %>% drop_na(metal)
+
+#taking out everything with THS
+CoinFinds = CoinFinds[!grepl("THS-", CoinFinds$cf_name),]
+CoinGroups = CoinGroups[!grepl("THS-", CoinGroups$cf_name),]
+
+
 ```
 
 Location Filter: For each coin find location, return all coin finds within a certain radius (that you input) in a list, forming a column of CoinFinds
@@ -254,7 +261,7 @@ for (z in c(1:cf_nrow)) {
 
 ```
 
-Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of the difference in metal amounts between the central coin find and each radius coin find.
+***Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of the difference in metal amounts between the central coin find and each radius coin find.
 ```{r}
 
 # creating columns for each metal type in Cut_CoinFinds
@@ -269,7 +276,11 @@ Cut_CoinFinds$dif.bronze = NA
 
 Cut_CoinFinds$is.lead.same = NA
 Cut_CoinFinds$dif.lead = NA
-
+  
+Cut_CoinFinds$total.gold = NA
+Cut_CoinFinds$total.silver = NA
+Cut_CoinFinds$total.bronze = NA
+Cut_CoinFinds$total.lead = NA
 
 for (z in c(1:cf_nrow)) {
   index = z
@@ -291,6 +302,10 @@ for (z in c(1:cf_nrow)) {
   point_lead = sum(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
   point_num_lead = length(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
  
+  Cut_CoinFinds$total.gold[index] = point_gold
+  Cut_CoinFinds$total.silver[index] = point_silver
+  Cut_CoinFinds$total.bronze[index] = point_bronze
+  Cut_CoinFinds$total.lead[index] = point_lead
   
   #get radius IDs
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
@@ -545,7 +560,6 @@ TEST_CoinFinds = TEST_CoinFinds[TEST_CoinFinds$one.in.radius==FALSE,]
 Create clusterID out of coin find IDs separated by periods that comprise a geographical cluster 
 ```{r}
 
-
 TEST_CoinFinds$clusterID = NA
 # creating clusterID and putting it in the main data frame
 for (i in c(1:nrow(TEST_CoinFinds))) {
@@ -555,7 +569,6 @@ for (i in c(1:nrow(TEST_CoinFinds))) {
   
   TEST_CoinFinds$clusterID[i] = clusterID
 }
-
 
 ```
 
@@ -627,7 +640,15 @@ return(cluster)
 FULL_clusters = dataframe with clusterID, cfID of the central cf, name of central coin find
 (This dataframe will have duplicates of clusterIDs)
 ```{r}
-FULL_clusters = data.frame(cfID = TEST_CoinFinds$ID, name = TEST_CoinFinds$cf_name, clusterID = TEST_CoinFinds$clusterID)
+FULL_clusters = data.frame(cfID = TEST_CoinFinds$ID, name = TEST_CoinFinds$cf_name, author = TEST_CoinFinds$cf_user, clusterID = TEST_CoinFinds$clusterID, 
+                           total.gold = TEST_CoinFinds$total.gold,
+                           total.silver = TEST_CoinFinds$total.silver,
+                           total.bronze = TEST_CoinFinds$total.bronze,
+                           total.lead = TEST_CoinFinds$total.lead,
+                           
+                           total.coins = TEST_CoinFinds$cf_num_coins_found,
+                           start.year = TEST_CoinFinds$cf_start_year,
+                           end.year = TEST_CoinFinds$cf_end_year)
 FULL_clusters$radius = rep(RADIUS, nrow(FULL_clusters))
 ```
 
@@ -636,9 +657,6 @@ Adding extra columns to FULL_clusters
 for number of coins, start and end date, and metals I have a column for percent matches in each cluster 
 and the avg of difference between the central coin find and the cluster value for the above attributes
 
-I have added an extra indicator for metals to interpret the date more easily. 
-For many coin finds, there will be no coins of a specific metal. For each metal I have added a boolean 
-value "is.X.zero" that will be TRUE when all coin finds in a cluster have no coins of X metal (FALSE otherwise)
 ```{r}
 ## Creating extra columns
 FULL_clusters$percent.num.coins.same = NA
@@ -653,19 +671,15 @@ FULL_clusters$avg.end.date.dif = NA
 #metals
 FULL_clusters$percent.silver.same = NA
 FULL_clusters$avg.silver.dif = NA
-FULL_clusters$is.silver.zero = NA
 
 FULL_clusters$percent.gold.same = NA
 FULL_clusters$avg.gold.dif = NA
-FULL_clusters$is.gold.zero = NA
 
 FULL_clusters$percent.bronze.same = NA
 FULL_clusters$avg.bronze.dif = NA
-FULL_clusters$is.bronze.zero = NA
 
 FULL_clusters$percent.lead.same = NA
 FULL_clusters$avg.lead.dif = NA
-FULL_clusters$is.lead.zero = NA
 
 #num coins
 for (i in c(1:nrow(FULL_clusters))) {
@@ -677,7 +691,7 @@ for (i in c(1:nrow(FULL_clusters))) {
   
   FULL_clusters$percent.num.coins.same[index] = ((length(num.coins[num.coins==TRUE])-1)/FULL_FULL$num.in.radius)*100
   
-  FULL_clusters$avg.coin.num.dif[i] = mean(coin.difs)
+  FULL_clusters$avg.coin.num.dif[i] = sum(coin.difs)/(length(coin.difs)-1)
 }
 
 
@@ -692,7 +706,7 @@ for (i in c(1:nrow(FULL_clusters))) {
   
   FULL_clusters$percent.start.date.same[index] = ((length(num.starts[num.starts==TRUE])-1)/FULL_FULL$num.in.radius)*100
   
-  FULL_clusters$avg.start.date.dif[i] = mean(start.date.difs)
+  FULL_clusters$avg.start.date.dif[i] = sum(start.date.difs)/(length(start.date.difs)-1)
   
 }
 
@@ -707,7 +721,7 @@ for (i in c(1:nrow(FULL_clusters))) {
   end.date.difs = unlist(FULL_FULL$end.date.dif[1][1])
   
   FULL_clusters$percent.end.date.same[index] = ((length(num.ends[num.ends==TRUE])-1)/FULL_FULL$num.in.radius)*100
-  FULL_clusters$avg.end.date.dif[i] = mean(end.date.difs)
+  FULL_clusters$avg.end.date.dif[i] = sum(end.date.difs)/(length(end.date.difs)-1)
 }
 
 
@@ -733,17 +747,25 @@ for (i in c(1:nrow(FULL_clusters))) {
   FULL_clusters$percent.bronze.same[index] = (length(num.bronze[num.bronze==TRUE])/FULL_FULL$num.in.radius)*100
   FULL_clusters$percent.lead.same[index] = (length(num.lead[num.lead==TRUE])/FULL_FULL$num.in.radius)*100
   
-  FULL_clusters$avg.silver.dif[i] = mean(silver.difs)
-  FULL_clusters$avg.gold.dif[i] = mean(gold.difs)
-  FULL_clusters$avg.bronze.dif[i] = mean(bronze.difs)
-  FULL_clusters$avg.lead.dif[i] = mean(lead.difs)
-  
-  FULL_clusters$is.lead.zero[i] = ifelse(length(unique(lead.difs)) == 1 & unique(lead.difs)[1]==0, TRUE, FALSE)
-  FULL_clusters$is.gold.zero[i] = ifelse(length(unique(gold.difs)) == 1 & unique(gold.difs)[1]==0, TRUE, FALSE)
-  FULL_clusters$is.silver.zero[i] = ifelse(length(unique(silver.difs)) == 1 & unique(silver.difs)[1]==0, TRUE, FALSE)
-  FULL_clusters$is.bronze.zero[i] = ifelse(length(unique(bronze.difs)) == 1 & unique(bronze.difs)[1]==0, TRUE, FALSE)
+  FULL_clusters$avg.silver.dif[i] = sum(silver.difs)/(length(silver.difs)-1)
+  FULL_clusters$avg.gold.dif[i] = sum(gold.difs)/(length(gold.difs)-1)
+  FULL_clusters$avg.bronze.dif[i] = sum(bronze.difs)/(length(bronze.difs)-1)
+  FULL_clusters$avg.lead.dif[i] = sum(lead.difs)/(length(lead.difs)-1)
+
 }
 
+```
+
+Reorder columns for easy viewing
+```{r}
+col_order <- c("cfID", "name", "author", "clusterID", "radius",
+               "total.gold", "avg.gold.dif", "percent.gold.same", 
+               "total.silver", "avg.silver.dif", "percent.silver.same", 
+               "total.bronze", "avg.bronze.dif", "percent.bronze.same", 
+               "total.lead", "avg.lead.dif", "percent.lead.same", 
+               "start.year", "avg.start.date.dif", "percent.start.date.same",
+               "end.year", "avg.end.date.dif", "percent.end.date.same")
+FULL_clusters <- FULL_clusters[, col_order]
 ```
 
 Adding one more column to FULL_clusters:
@@ -798,6 +820,15 @@ At_Least_One_Match = FULL_clusters[FULL_clusters$percent.num.coins.same>0 | FULL
 At_Least_Three_Match = At_Least_One_Match[FULL_clusters$how.many.matches>=3,]
 ```
 
+CREATING SUB CLUSTERS
+```{r}
+
+
+
+
+
+```
+
 
 #############
 OUTPUTS:
@@ -813,6 +844,11 @@ in each cluster and avg difference (central find - radius find) between attribut
 ```{r}
 write_xlsx(FULL_clusters,"/cloud/project/Possible_Duplicates.xlsx")
 ```
+
+
+
+
+
 
 This is a shortened version of this spread sheet that only keeps one of the coin find entries for each cluster.
 ```{r}
