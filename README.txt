@@ -1,3 +1,44 @@
+
+Giving an overview of the data and what generally the program does. 
+
+All assistant knows is if find A is same as find B
+second doc:
+13292 in one column | second ID | YES or NO
+all possible cominations within a cluster must be tested between each other so groups of two of each cluster in rows
+
+Subclustering:
+
+comparing items in the clusters to each other. 
+if there are more than zero silver coins, 
+-match up whether the silver of that one match the silver to that one. 
+-do same for gold
+
+
+- create a percent match
+the matches get sorted to the top of the list 
+
+same number silver gold bronze and have the same date range - 
+
+
+date range- min in coin groups for start year to max in coin groups for end year
+
+check that you aren't subtracting the same thing from each other
+
+an example from one coin find. 
+
+------
+TODO: 
+
+-direct comparison list with quantification (what do manually entered answers look like
+  - simple TRUE or FALSE with recommendation of what to do with them and then a maybe
+  FIND A | FIND B | SAME? | What do we do with it?
+  
+-fix date ranges
+-do group me file with the larger overivew of logic as well as example mathematically
+-input finds that aren't the same back into code so that it discounts
+
+-----
+
 Input: 
 -CoinFinds
 -CoinGroups
@@ -26,17 +67,9 @@ Date Range Filter: I break up start and end date for each coin find. Then I comp
 #########
 Output: This program creates four output spread sheets:
 
-Not_A_Duplicate.xlsx
--all coin finds that have nothing in their cluster
-*The first half of the columns are what was inputted into the program*
-in.radius = list of the cfIDs that are in a geographical cluster with the central cf
-num.in.radius = lists how many coin finds are in a cluster
-are.X.same  = For each coin find in a cluster, TRUE if the value of a given attribute is the same as the central find (within a tolerance) and FALSE if the value is not the same
-dif.X = This is a list of the differences the central find value for a given attribute - the given attribute for each coin find in the radius
-one.in.radius = TRUE if a coin find has an empty cluster and FALSE otherwise
 
 Possible_Duplicates.xlsx
-- this data frame contains all location clusters (length = ~2,300)
+- this data frame contains all location clusters (length = 1,200)
 
 cfID = coin find ID of central coin find
 name = name of central coin find
@@ -44,17 +77,12 @@ clusterID = all the IDs of the coin finds in a cluster seperated by periods
 radius = size of radius in km
 percent.num.coins.same = percent of coin finds in a cluster that have the same amount of coins as the central ID (+/- 5)
 avg.coin.num.dif = average(number of coins of central cf - number of coins in each 
+
+
 *All other percent and average columns follow the same idea*
 is.gold/bronze/silver.zero = Some of the metals (esp gold and silver) will be absent from many coin finds. This means that coins finds with an equal amount of gold coins, for example, will look the same in the spread sheet (percent.gold.same = 0 and avg.gold.dif = 0) as coin finds all with gold zero coins. I added this column that will be TRUE when all coins in a cf cluster have zero of one type of metal and that will be FALSE otherwise. 
 how.many.matches = this counts how many attributes have a percent match > 0
 
-
-At_Least_One_Match.xlsx
-- this data frame contains only location clusters that also match on one other attribute (amount of coins, data range, etc.) (length = ~2,200)
-- the column descriptions from Possible_Duplicates apply here
-
-Short_Clusters.xlsx
-- In Possible_Duplicates and At_Leat_One_Match, there is a repeat of clusters in the data frames because many coin finds will be in the same cluster together. Therefore, I created this shorter data frame (~500 entries) that keeps only one of the coin find entries for each cluster. 
 
 
 
