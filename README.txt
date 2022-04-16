@@ -1,10 +1,22 @@
 
-Giving an overview of the data and what generally the program does. 
+PURPOSE: This program was made to identify possible duplicate coin finds in FLAME's database so that they can be addressed.
+
+INPUT: This program takes as inputs dataframes of the coin finds, coin groups, and a key of which coin denominations correspond to specific metals. A user can also input a spread sheet of coin finds that are not duplicates. 
+
+OUTPUT: The program will output a spread sheet of possible duplicates for someone to manually check.
+The spreadsheet will be formatted like this:
+
+cf ID A | cf ID B | 
+
 
 All assistant knows is if find A is same as find B
 second doc:
 13292 in one column | second ID | YES or NO
 all possible cominations within a cluster must be tested between each other so groups of two of each cluster in rows
+
+
+
+
 
 Subclustering:
 
