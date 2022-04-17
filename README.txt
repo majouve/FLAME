@@ -1,12 +1,13 @@
 
-PURPOSE: This program was made to identify possible duplicate coin finds in FLAME's database so that they can be addressed.
+PURPOSE: This program was made to identify possible duplicate coin finds (CFs) in FLAME's database so that they can be addressed.
 
-INPUT: This program takes as inputs dataframes of the coin finds, coin groups, and a key of which coin denominations correspond to specific metals. A user can also input a spread sheet of coin finds that are not duplicates. 
+INPUT: This program takes as inputs dataframes of the CFs, coin groups (CGs), and a key that describes which coin denominations correspond to specific metals. These three data sets can be found in this repository. A user can also input a spread sheet of coin finds that are not duplicates, and the program will disregard them. 
 
-OUTPUT: The program will output a spread sheet of possible duplicates for someone to manually check.
+OUTPUT: The program will output a spread sheet of the cfIDs of possible duplicates (CF A and CF B) for someone to manually check. There will be a blank YES/NO column for someone to input whether the pair are duplicates are not. In the column "match score," each possible duplicate pair will be assigned a number that quantifies the degree to which the two match based on metrics which will be discussed below. The spread sheet will be sorted by the match score
+
 The spreadsheet will be formatted like this:
 
-cf ID A | cf ID B | 
+match score | cf ID A | cf ID B | YES/NO | NOTES
 
 
 All assistant knows is if find A is same as find B
