@@ -8,7 +8,24 @@ OUTPUT: The program will output a spread sheet of the cfIDs of possible duplicat
 The spreadsheet will be formatted like this:
 
 match score | cf ID A | cf ID B | YES/NO | NOTES
+###############
 
+Now, I will walk through an overview of the program using some example coin finds. The code is seperated into chunks, which I have numbered to make it easier to refer to. I will using the following coin finds, which have been idenfied as possible duplicates, as an example case while explaining the code: 
+
+cfID  | name | x-coord | y-coord | excavation start | excavation end | start year | end year | num coins found | Gold | Silver | Bronze | Lead
+
+13293 |
+9239  |
+
+(ONE) Replacing NAs and Striking Coin Finds
+This step does not apply to the example above, but for coin finds/coin groups that meet these criteria, they are not tested to see if they are duplicates
+- If any cf_num_coins_found==NA or 0 after an attempt is made to reconstruct this number with Coin Group info. 
+- cg_num_coins_found==NA or 0 after an attempt is made to reconstruct this number with Coin Group info. 
+- Coin Groups where metal == NA
+
+Additionally, there are a few coin finds that have NAs listed for the number of coins found. To rememdy this, I totaled the coin amounts listed for each coin group 
+
+Filling in NAs in cf_num_coins_found with amounts in CoinGroups dataframe (though some coin amounts in CoinGroups are also NA).
 
 All assistant knows is if find A is same as find B
 second doc:
