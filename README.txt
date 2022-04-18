@@ -102,15 +102,35 @@ total.silver =
 
 ###(FIVE) Excavation Filter
 The dates of the excavation start and end years are compared seperately between the central coin find and each radius coin find. 
+The same comparison occurs here as well for the variable excav.start.year and excav.end.year for each coin find in the cluster. The tolerance for this comparison is 2.
+
+13293's excavation started in 2005, and 9239's started in 1969. (FALSE)
+13293's excavation ended in 1968, and 9239's ended in 2010. (FALSE)
+
+Therefore, this module produces two lists
+are.excav.start.same = c(TRUE, FALSE)
+are.excav.end.same = c(TRUE, FALSE)
+
+NOTE: Alternative outputs are:
+NA: This occurs when the central coin find has NA for the start year or the end year
+NA as the component of a list (ex. c(97, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
 
 
-
-
-###(SIX) Date Range Filter
+[EDIT] ###(SIX) Date Range Filter
 The dates of the start and end years of a coin find are compared seperately between the central coin find and each radius coin find. 
+The same comparison occurs here as well for the variable excav.start.year and excav.end.year for each coin find in the cluster. The tolerance for this comparison is 2.
 
-: I break up start and end date for each coin find. Then I compare the start and end dates between the central coin find and the radius coin finds. Creates a column of TRUE/FALSES in Cut_CoinFinds indicating whether the start and end dates of the radius point is the same or different (within a range you input) from the central point. I also calculate the difference between the start and end dates of the central find and that of each radius find. This forms another column of lists. 
--filter currently set to +/- 25
+13293's excavation started in 2005, and 9239's started in 1969. (FALSE)
+13293's excavation ended in 1968, and 9239's ended in 2010. (FALSE)
+
+Therefore, this module produces two lists
+are.excav.start.same = c(
+are.excav.end.same = c(
+
+NOTE: Alternative outputs are:
+NA: This occurs when the central coin find has NA for the start year or the end year
+NA as the component of a list (ex. c(97, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
+
 
 ###(SEVEN) Cut out Finds with Nothing in the Radius
 
