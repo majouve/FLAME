@@ -18,14 +18,16 @@ cfID  | name | x-coord | y-coord | excavation start | excavation end | start yea
 9239  |
 
 (ONE) Replacing NAs and Striking Coin Finds
-This step does not apply to the example above, but for coin finds/coin groups that meet these criteria, they are not tested to see if they are duplicates
+There are a few coin finds that have NAs listed for the number of coins found. To rememdy this, I totaled the coin amounts listed for each coin group and replaced the NA with this total. 
+
+Then, for coin finds/coin groups that meet the following criteria, they are struck from the data set. 
 - If any cf_num_coins_found==NA or 0 after an attempt is made to reconstruct this number with Coin Group info. 
-- cg_num_coins_found==NA or 0 after an attempt is made to reconstruct this number with Coin Group info. 
+- cg_num_coins_found==NA or 0 
 - Coin Groups where metal == NA
 
-Additionally, there are a few coin finds that have NAs listed for the number of coins found. To rememdy this, I totaled the coin amounts listed for each coin group 
 
-Filling in NAs in cf_num_coins_found with amounts in CoinGroups dataframe (though some coin amounts in CoinGroups are also NA).
+
+
 
 All assistant knows is if find A is same as find B
 second doc:
