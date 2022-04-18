@@ -3,11 +3,13 @@ PURPOSE: This program was made to identify possible duplicate coin finds (CFs) i
 
 INPUT: This program takes as inputs dataframes of the CFs, coin groups (CGs), and a key that describes which coin denominations correspond to specific metals. These three data sets can be found in this repository. A user can also input a spread sheet of coin finds that are not duplicates, and the program will disregard them. 
 
-OUTPUT: The program will output a spread sheet of the cfIDs of possible duplicates (CF A and CF B) for someone to manually check. There will be a blank YES/NO column for someone to input whether the pair are duplicates are not. In the column "match score," each possible duplicate pair will be assigned a number that quantifies the degree to which the two match based on metrics which will be discussed below. The spread sheet will be sorted by the match score
+OUTPUT 1: The program will output a spread sheet of the cfIDs of possible duplicates (CF A and CF B) for someone to manually check. There will be a blank YES/NO column for someone to input whether the pair are duplicates are not. In the column "match score," each possible duplicate pair will be assigned a number that quantifies the degree to which the two match based on metrics which will be discussed below. The spread sheet will be sorted by the match score
 
 The spreadsheet will be formatted like this:
 
 match score | cf ID A | cf ID B | YES/NO | NOTES
+
+OUTPUT 2: You can also get a spreadsheet called PossibleDuplicates.xlsx that gives you the geographical cluster that every coin find is attached to. 
 ###############
 
 Now, I will walk through an overview of the program using some example coin finds. The code is seperated into chunks, which I have numbered to make it easier to refer to. I will using the following coin finds, which have been idenfied as possible duplicates, as an example case while explaining the code: 
@@ -116,16 +118,25 @@ NA: This occurs when the central coin find has NA for the start year or the end 
 NA as the component of a list (ex. c(97, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
 
 
-[EDIT] ###(SIX) Date Range Filter
+[DEBUG] ###(SIX) Date Range Filter
 The dates of the start and end years of a coin find are compared seperately between the central coin find and each radius coin find. 
-The same comparison occurs here as well for the variable excav.start.year and excav.end.year for each coin find in the cluster. The tolerance for this comparison is 2.
+The same comparison occurs here as well for the variable is.cf.start.year.same and is.cf.end.year.same for each coin find in the cluster. The tolerance for this comparison is 2.
 
-13293's excavation started in 2005, and 9239's started in 1969. (FALSE)
-13293's excavation ended in 1968, and 9239's ended in 2010. (FALSE)
+13293's excavation started in 582, and 9239's started in -300. (FALSE)
+13293's excavation ended in 685, and 9239's ended in 750. (FALSE)
 
 Therefore, this module produces two lists
-are.excav.start.same = c(
-are.excav.end.same = c(
+is.cf.start.year.same = c(TRUE, FALSE)
+is.cf.end.year.same = c(TRUE, FALSE)
+
+Then, it also produces to difference lists:
+13293
+start.date.dif = c(0, 882)
+end.date.dife = c(0, FALSE)
+
+9239
+start.date.dif = c(0, -65)
+end.date.dife = c(0, FALSE)
 
 NOTE: Alternative outputs are:
 NA: This occurs when the central coin find has NA for the start year or the end year
@@ -133,19 +144,17 @@ NA as the component of a list (ex. c(97, NA)): This occurs when one of the radiu
 
 
 ###(SEVEN) Cut out Finds with Nothing in the Radius
-
+In the Cut_CoinFinds dataframe (main dataframe where all the columns have been added), there are many coin finds with nothing in their radius. 
+I strip these from the data set, saving the smaller data set into TEST_CoinFinds. This has ~2,000 cfs. 
 
 ###(EIGHT) Create Cluster IDs
+Then I created a cluster ID for each geographical cluster. It is composed of the cfIDs in the cluster seperated by ".". For our example, the cluster ID would be 13293.9239
 
-
-###(NINE) Create Cluster Comparison Data Frame (FULL_clusters)
-
-
-###(TEN & ELEVEN) Reformatting Full Clusters
-
+###(NINE & TEN & ELEVEN) Create Cluster Comparison Data Frame (FULL_clusters)
+Now, I created a new data frame with new metrics to help make comparisons between the clusters better:
 
 ###(TWELVE) Match Score
-
+Then I create the match score to help us prioritize which coin clusters to compare for duplicates first. 
 
 Input: 
 -CoinFinds
