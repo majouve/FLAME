@@ -126,6 +126,8 @@ CF_to_CG = function(cf_IDs) {
 
 ```
 
+
+(ONE) 
 Filling in NAs in cf_num_coins_found with amounts in CoinGroups dataframe (though some coin amounts in CoinGroups are also NA).
 A few categories of coin groups and coin finds get struck:
 - If cf_num_coins_found==NA or 0 after this reformatting
@@ -157,7 +159,7 @@ CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found != 0 & !is.na(CoinFinds$cf_nu
 # taking out rows where cg_num_coins_found is equal to 0 and cg_num_coins_found
 CoinGroups = CoinGroups[CoinGroups$cg_num_coins != 0 & !is.na(CoinGroups$cg_num_coins),]
 
-# taking out coin groups where metal == 0
+# taking out coin groups where metal == NA
 CoinGroups = CoinGroups %>% drop_na(metal)
 
 #taking out everything with THS
@@ -167,6 +169,7 @@ CoinGroups = CoinGroups[!grepl("THS-", CoinGroups$cf_name),]
 
 ```
 
+(TWO)
 Location Filter: For each coin find location, return all coin finds within a certain radius (that you input) in a list, forming a column of CoinFinds
 ```{r}
 #####INPUT RADIUS IN KM####
@@ -213,6 +216,7 @@ Cut_CoinFinds = CoinFinds
 
 ```
 
+(THREE)
 Quantity Filter: compares cf_num_coins_found between the central point and the radius points. Creates a column of TRUE/FALSES in Cut_CoinFinds indicating whether the radius point is the same or different (within a range you input) from the central point. 
 I also calculate the difference between the amount of coins of the central find and that of each radius find. This forms another column of lists. 
 ```{r}
@@ -261,6 +265,7 @@ for (z in c(1:cf_nrow)) {
 
 ```
 
+(FOUR)
 ***Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of the difference in metal amounts between the central coin find and each radius coin find.
 ```{r}
 
@@ -390,6 +395,7 @@ for (z in c(1:cf_nrow)) {
 
 ```
 
+(FIVE)
 Excavation Year Filter: does the same comparison but with cf_excavation_start and cf_excavation_end
 ```{r}
 ####INPUT####
@@ -438,7 +444,7 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
      if (is.na(excav_end_list[o])) {
       are.excav.end.same[o] = NA
       }
-    else if (excav_end_list[o] <= (excav_end+END_RANGE) &  excav_end_list[o] >= (excav_end-END_RANGE)) {
+    else if (excav_end_list[o] <= (excav_start+START_RANGE) & excav_start_list[o] >= (excav_start-START_RANGE)) {
       are.excav.end.same[o] = TRUE} 
     else {
       are.excav.end.same[o] = FALSE  }
@@ -452,6 +458,7 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
 
 ```
 
+(SIX)
 Date Range: does the same comparison but with cf_start_year and cf_end_year
 ```{r}
 ####INPUT####
@@ -531,6 +538,7 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
 ```
 #########
 
+(SEVEN)
 Cut out finds with no other finds in their radius. 
 ```{r}
 # create new dataframe of possible duplicates to test
@@ -557,6 +565,7 @@ TEST_CoinFinds = TEST_CoinFinds[TEST_CoinFinds$one.in.radius==FALSE,]
 
 ```
 
+(EIGHT)
 Create clusterID out of coin find IDs separated by periods that comprise a geographical cluster 
 ```{r}
 
@@ -572,71 +581,7 @@ for (i in c(1:nrow(TEST_CoinFinds))) {
 
 ```
 
-Create functions that pulls out an inputted cluster from TEST_CoinFinds and splits up the true and false list to a table
-```{r}
-#####Get information on a specific cluster
-cluster_info = function(clusterID) {
-
-  # pulls info of all coins in a cluster and adds clusterID
- list = as.integer(unlist(strsplit(clusterID, split=".", fixed = T)))
- cluster =  Cut_CoinFinds[Cut_CoinFinds$ID %in% list,]
- cluster = subset(cluster, select = -c(cf_place_name,cf_custom_place_name, cf_custom_region, cf_custom_region_vague, cf_vague, cf_comment, cf_date_entered, Exported.at, cf_publication_ref, cf_user, Coin.Find.Json, in.radius) )
- cluster$clusterID = c(rep(clusterID, rep=nrow(cluster)))
- 
- #beginning to reformat the TRUE/FALSE lists
- ref_are.num.coins.same = unlist(cluster$are.num.coins.same[1])
- 
- ref_is.silver.same = unlist(cluster$is.silver.same[1])
- ref_is.gold.same = unlist(cluster$is.gold.same[1])
- ref_is.bronze.same = unlist(cluster$is.bronze.same[1])
- ref_is.lead.same = unlist(cluster$is.lead.same[1])
- ref_total.silver = unlist(cluster$total.silver[1])
- ref_total.gold = unlist(cluster$total.gold[1])
- ref_total.bronze = unlist(cluster$total.bronze[1])
- ref_total.lead = unlist(cluster$total.lead[1])
- 
- ref_are.excav.start.same = unlist(cluster$are.excav.start.same[1])
- ref_are.excav.end.same = unlist(cluster$are.excav.end.same[1])
- 
- ref_is.cf.start.year.same = unlist(cluster$is.cf.start.year.same[1])
- ref_is.cf.end.year.same = unlist(cluster$is.cf.end.year.same[1])
- 
- #putting TRUE/FALSEs into the cluster data frame
- for(z in c(1:nrow(cluster))) {
-   
-   cluster$are.num.coins.same[z] = ref_are.num.coins.same[z]
-   
-   cluster$is.silver.same[z] = ref_is.silver.same[z]
-   cluster$is.gold.same[z] = ref_is.gold.same[z]
-   cluster$is.bronze.same[z] = ref_is.bronze.same[z]
-   cluster$is.lead.same[z] = ref_is.lead.same[z]
-   
-   cluster$total.silver[z] = ref_total.silver[z]
-   cluster$total.gold[z] = ref_total.gold[z]
-   cluster$total.bronze[z] = ref_total.bronze[z]
-   cluster$total.lead[z] = ref_total.lead[z]   
-   
-   cluster$are.excav.start.same[z] = ref_are.excav.start.same[z]
-   cluster$are.excav.end.same[z] = ref_are.excav.end.same[z]
-   cluster$is.cf.start.year.same[z] = ref_is.cf.start.year.same[z]
-   cluster$is.cf.end.year.same[z] = ref_is.cf.end.year.same[z]
-   
- }
- 
-#reformat dataframe for easier comparison
-col_order <- c("ID", "cf_name", "cf_custom_x_coordinate","cf_custom_y_coordinate",
-               "clusterID", "num.in.radius", 
-               "cf_excavation_start", "are.excav.start.same", "cf_excavation_end", "are.excav.end.same", "cf_excavation_name", "cf_excavation", "cf_single_find", "cf_hoard",
-               "cf_start_year", "is.cf.start.year.same", "cf_end_year", "is.cf.end.year.same",
-               "cf_num_coins_found", "are.num.coins.same",
-               "total.gold", "is.gold.same", "total.silver", "is.silver.same", "total.bronze", "is.bronze.same", "total.lead", "is.lead.same")
-cluster <- cluster[, col_order]
- 
-return(cluster)
-}
-
-```
-
+(NINE)
 FULL_clusters = dataframe with clusterID, cfID of the central cf, name of central coin find
 (This dataframe will have duplicates of clusterIDs)
 ```{r}
@@ -652,11 +597,10 @@ FULL_clusters = data.frame(cfID = TEST_CoinFinds$ID, name = TEST_CoinFinds$cf_na
 FULL_clusters$radius = rep(RADIUS, nrow(FULL_clusters))
 ```
 
-
+(TEN)
 Adding extra columns to FULL_clusters
 for number of coins, start and end date, and metals I have a column for percent matches in each cluster 
 and the avg of difference between the central coin find and the cluster value for the above attributes
-
 ```{r}
 ## Creating extra columns
 FULL_clusters$percent.num.coins.same = NA
@@ -756,6 +700,7 @@ for (i in c(1:nrow(FULL_clusters))) {
 
 ```
 
+(ELEVEN)
 Reorder columns for easy viewing
 ```{r}
 col_order <- c("cfID", "name", "author", "clusterID", "radius",
@@ -768,8 +713,9 @@ col_order <- c("cfID", "name", "author", "clusterID", "radius",
 FULL_clusters <- FULL_clusters[, col_order]
 ```
 
+(TWELVE)
 Adding one more column to FULL_clusters:
-column indicating how many attributes of the coin find clusters match up
+Match Score
 ```{r}
 FULL_clusters$how.many.matches = NA
 
@@ -810,26 +756,6 @@ for (i in c(1:nrow(FULL_clusters))) {
 
 ```
 
-Creating a smaller subset of coin finds more likely to be duplicates
-```{r}
-At_Least_One_Match = FULL_clusters[FULL_clusters$percent.num.coins.same>0 | FULL_clusters$percent.start.date.same>0 | FULL_clusters$percent.end.date.same>0 | (FULL_clusters$percent.bronze.same>0 & FULL_clusters$is.bronze.zero==FALSE) | 
- (FULL_clusters$percent.silver.same>0 & FULL_clusters$is.silver.zero==FALSE) |
-   (FULL_clusters$percent.gold.same>0 & FULL_clusters$is.gold.zero==FALSE) |
-   (FULL_clusters$percent.lead.same>0 & FULL_clusters$is.lead.zero==FALSE),]
-
-At_Least_Three_Match = At_Least_One_Match[FULL_clusters$how.many.matches>=3,]
-```
-
-CREATING SUB CLUSTERS
-```{r}
-
-
-
-
-
-```
-
-
 #############
 OUTPUTS:
 Run to get a spread sheet of coin finds that aren't possible duplicates
@@ -846,9 +772,83 @@ write_xlsx(FULL_clusters,"/cloud/project/Possible_Duplicates.xlsx")
 ```
 
 
+#####
+UNUSED CODE
 
+Create functions that pulls out an inputted cluster from TEST_CoinFinds and splits up the true and false list to a table
+```{r}
+#####Get information on a specific cluster
+cluster_info = function(clusterID) {
 
+  # pulls info of all coins in a cluster and adds clusterID
+ list = as.integer(unlist(strsplit(clusterID, split=".", fixed = T)))
+ cluster =  Cut_CoinFinds[Cut_CoinFinds$ID %in% list,]
+ cluster = subset(cluster, select = -c(cf_place_name,cf_custom_place_name, cf_custom_region, cf_custom_region_vague, cf_vague, cf_comment, cf_date_entered, Exported.at, cf_publication_ref, cf_user, Coin.Find.Json, in.radius) )
+ cluster$clusterID = c(rep(clusterID, rep=nrow(cluster)))
+ 
+ #beginning to reformat the TRUE/FALSE lists
+ ref_are.num.coins.same = unlist(cluster$are.num.coins.same[1])
+ 
+ ref_is.silver.same = unlist(cluster$is.silver.same[1])
+ ref_is.gold.same = unlist(cluster$is.gold.same[1])
+ ref_is.bronze.same = unlist(cluster$is.bronze.same[1])
+ ref_is.lead.same = unlist(cluster$is.lead.same[1])
+ ref_total.silver = unlist(cluster$total.silver[1])
+ ref_total.gold = unlist(cluster$total.gold[1])
+ ref_total.bronze = unlist(cluster$total.bronze[1])
+ ref_total.lead = unlist(cluster$total.lead[1])
+ 
+ ref_are.excav.start.same = unlist(cluster$are.excav.start.same[1])
+ ref_are.excav.end.same = unlist(cluster$are.excav.end.same[1])
+ 
+ ref_is.cf.start.year.same = unlist(cluster$is.cf.start.year.same[1])
+ ref_is.cf.end.year.same = unlist(cluster$is.cf.end.year.same[1])
+ 
+ #putting TRUE/FALSEs into the cluster data frame
+ for(z in c(1:nrow(cluster))) {
+   
+   cluster$are.num.coins.same[z] = ref_are.num.coins.same[z]
+   
+   cluster$is.silver.same[z] = ref_is.silver.same[z]
+   cluster$is.gold.same[z] = ref_is.gold.same[z]
+   cluster$is.bronze.same[z] = ref_is.bronze.same[z]
+   cluster$is.lead.same[z] = ref_is.lead.same[z]
+   
+   cluster$total.silver[z] = ref_total.silver[z]
+   cluster$total.gold[z] = ref_total.gold[z]
+   cluster$total.bronze[z] = ref_total.bronze[z]
+   cluster$total.lead[z] = ref_total.lead[z]   
+   
+   cluster$are.excav.start.same[z] = ref_are.excav.start.same[z]
+   cluster$are.excav.end.same[z] = ref_are.excav.end.same[z]
+   cluster$is.cf.start.year.same[z] = ref_is.cf.start.year.same[z]
+   cluster$is.cf.end.year.same[z] = ref_is.cf.end.year.same[z]
+   
+ }
+ 
+#reformat dataframe for easier comparison
+col_order <- c("ID", "cf_name", "cf_custom_x_coordinate","cf_custom_y_coordinate",
+               "clusterID", "num.in.radius", 
+               "cf_excavation_start", "are.excav.start.same", "cf_excavation_end", "are.excav.end.same", "cf_excavation_name", "cf_excavation", "cf_single_find", "cf_hoard",
+               "cf_start_year", "is.cf.start.year.same", "cf_end_year", "is.cf.end.year.same",
+               "cf_num_coins_found", "are.num.coins.same",
+               "total.gold", "is.gold.same", "total.silver", "is.silver.same", "total.bronze", "is.bronze.same", "total.lead", "is.lead.same")
+cluster <- cluster[, col_order]
+ 
+return(cluster)
+}
 
+```
+
+Creating a smaller subset of coin finds more likely to be duplicates
+```{r}
+At_Least_One_Match = FULL_clusters[FULL_clusters$percent.num.coins.same>0 | FULL_clusters$percent.start.date.same>0 | FULL_clusters$percent.end.date.same>0 | (FULL_clusters$percent.bronze.same>0 & FULL_clusters$is.bronze.zero==FALSE) | 
+ (FULL_clusters$percent.silver.same>0 & FULL_clusters$is.silver.zero==FALSE) |
+   (FULL_clusters$percent.gold.same>0 & FULL_clusters$is.gold.zero==FALSE) |
+   (FULL_clusters$percent.lead.same>0 & FULL_clusters$is.lead.zero==FALSE),]
+
+At_Least_Three_Match = At_Least_One_Match[FULL_clusters$how.many.matches>=3,]
+```
 
 This is a shortened version of this spread sheet that only keeps one of the coin find entries for each cluster.
 ```{r}
@@ -869,9 +869,6 @@ Output: a spread sheet and data frame of the info on a specific cluster
 cluster = cluster_info("7920.7921.13298.13299")
 write_xlsx(cluster,"/cloud/project/cluster.xlsx")
 ```
-
-
-
 
 
 
