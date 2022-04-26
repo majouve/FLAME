@@ -1,4 +1,4 @@
-#OVERVIEW
+## OVERVIEW
 
 PURPOSE: This program was made to identify possible duplicate coin finds (CFs) in FLAME's database so that they can be addressed.
 
@@ -13,7 +13,7 @@ match score | cf ID A | cf ID B | YES/NO | NOTES
 OUTPUT 2: You can also get a spreadsheet called PossibleDuplicates.xlsx that gives you the geographical cluster that every coin find is attached to. 
 
 
-#Detailed Description
+## Detailed Description
 
 Now, I will walk through the program using some example coin finds. The code is seperated into chunks, which I have numbered to make it easier to refer to. I will using the following coin finds, which have been idenfied as possible duplicates, as an example case while explaining the code: 
 
@@ -27,9 +27,9 @@ Now, I will walk through the program using some example coin finds. The code is 
 | 13293 | 533        |              |   1          |            |
 | 9239  |            |              |   87         |            |
 
-**The date ranges for coins in the coin find data fram sometimes have inconsistent dates. I will soon be correcting this by reconstructing the correct date from the coin group data frame. 
+***The date ranges for coins in the coin find data fram sometimes have inconsistent dates. I will soon be correcting this by reconstructing the correct date from the coin group data frame. 
 
-##(ONE) Replacing NAs and Striking Coin Finds
+### (ONE) Replacing NAs and Striking Coin Finds
 There are a few coin finds that have NAs listed for the number of coins found. To rememdy this, I totaled the coin amounts listed for each coin group and replaced the NA with this total. 
 
 Then, for coin finds/coin groups that meet the following criteria, they are struck from the data set. 
@@ -41,7 +41,7 @@ Then, for coin finds/coin groups that meet the following criteria, they are stru
 Therefore, we start with ~5,200 coin finds and reduce down to ~3,800
 
 
-##(TWO) Location Filter (This block takes the longest to run)
+### (TWO) Location Filter (This block takes the longest to run)
 Coin finds are grouped into geographical clusters that set which coin finds get compared to each other throughout the program. 
 
 First, the user sets a radius for the geographical size of the cluster desired. This is currently set to 1 km. Using the latitude and longitude coordinates assigned to every coin find, the program uses the sf package to create spatial objects for each coin find. 
@@ -54,7 +54,7 @@ For every central CF, a list of CFs (including itself) are stored in the coin fi
 For our example, this will look like c(13293, 9239).
 
 
-##(THREE) Quantity Filter
+### (THREE) Quantity Filter
 The amount of coins for each find is compared between members of a geographical cluster. 
 
 The user can set a tolerance for how large the difference between coin amounts has to be before the program will read them as being different. This is currently set to 5 (this means that if cfA has 5 coins and cfB has 7 coins, they will be marked as having the same amount of coins). 
@@ -72,7 +72,7 @@ The final output in the column will be c(0, 447)
 ***Hereafter, I will not do the 13293 to 13293 comparison. This understood comparison will always yield a TRUE as the first term of the output lists. 
 
 
-##(FOUR) Metal Filter
+### (FOUR) Metal Filter
 The amount of coins of each metal for each find is compared between members of a cluster, producing a seperate TRUE/FALSE list for each metal. 
 
 First, for each coin find, all the coin amounts for the coin groups of a specific metal are added together to produce total amounts. Values for our example coin finds are listed in the tables at the top of the document. 
@@ -111,7 +111,7 @@ total.bronze =
 total.silver = 
 
 
-##(FIVE) Excavation Filter
+### (FIVE) Excavation Filter
 The dates of the excavation start and end years are compared seperately between the central coin find and each radius coin find. 
 The same comparison occurs here as well for the variable excav.start.year and excav.end.year for each coin find in the cluster. The tolerance for this comparison is currently set to 2.
 
@@ -127,7 +127,7 @@ NA: This occurs when the central coin find has NA for the start year or the end 
 NA as the component of a list (ex. c(0, 67, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
 
 
-##(SIX) Date Range Filter
+### (SIX) Date Range Filter
 The dates of the start and end years of a coin find are compared seperately between the central coin find and each radius coin find. 
 The same comparison occurs here as well for the variable is.cf.start.year.same and is.cf.end.year.same for each coin find in the cluster. The tolerance for this comparison is 2.
 
@@ -147,40 +147,40 @@ NA: This occurs when the central coin find has NA for the start year or the end 
 NA as the component of a list (ex. c(0, 97, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
 
 
-##(SEVEN) Cut out Finds with Nothing in the Radius
+### (SEVEN) Cut out Finds with Nothing in the Radius
 In the Cut_CoinFinds dataframe (main dataframe where all the columns have been added), there are many coin finds with nothing in their radius. 
 I subset these from the data set, saving the smaller data set of coins with possible duplicates into TEST_CoinFinds. This has ~2,000 cfs. 
 
 The coin finds that have no geographical matches are also saved into a dataframe. This dataframe can be inputted into the program so that these coin finds are disconsidered when the program is run in the future.
 
 
-##(EIGHT) Create Cluster IDs
+### (EIGHT) Create Cluster IDs
 Then I created a cluster ID for each geographical cluster. It is composed of the cfIDs in the cluster seperated by ".". For our example, the cluster ID would be 13293.9239
 
 
-##(NINE & TEN & ELEVEN) Create Cluster Comparison Data Frame (FULL_clusters)
+### (NINE & TEN & ELEVEN) Create Cluster Comparison Data Frame (FULL_clusters)
 Now, I created a new data frame (FULL_clusters) with new metrics to help make comparisons between the clusters better. I include the following information in this data frame:
 
-*cfID, name (long name assigned to find), author (person who inputted the find)
-*cluster ID
-*radius = the radius the geographical cluster is in (set to 1 for all)
+-cfID, name (long name assigned to find), author (person who inputted the find)
+-cluster ID
+-radius = the radius the geographical cluster is in (set to 1 for all)
 
 After this indentifying material, I cycle through the same three types of columns for each metric:
-*total.gold/silver/bronze/lead
-*start/end.year
-*excav.start/end.year
+-total.gold / silver / bronze / lead
+-start/end.year
+-excav.start/end.year
 
 I have columns for three metric:
-*I list the value itself (ex. total.gold, excavation start year)
+-I list the value itself (ex. total.gold, excavation start year)
 
-*avg.X.dif = sum(central find - each radius find)
+-avg.X.dif = sum(central find - each radius find)
 ex. avg.bronze.dif = (0-86)/(2-1) =  -86
 NOTE = the bronze difference list is c(0, -86). By subtracting one from the denominator, we don't consider the 0 from 13293 being subtracted from itself.
 
-*percent.X.same = percent of the values in the TRUE/FALSE list that are TRUE (excluding the value that is true because the central coin find is compared to itself)
+-percent.X.same = percent of the values in the TRUE/FALSE list that are TRUE (excluding the value that is true because the central coin find is compared to itself)
 ex. For avg.bronze.dif of 13293 = (1/(2-1)) = 0% 
 NOTE = the bronze TRUE/FALSE list is c(TRUE,FALSE). By subtracting one from the denominator, we don't consider the TRUE from 13293 being compared to itself.
 
-##(TWELVE) Match Score
+### (TWELVE) Match Score
 Then I create the match score to help us prioritize which coin clusters to compare for duplicates first. The match score will use the metrics calculated in the FULL_clusters data frame. In the final output data frame, the match score will be used to sort coin finds that are the most likely to be duplicates to the top.
 
