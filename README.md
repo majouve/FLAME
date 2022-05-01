@@ -67,7 +67,8 @@ The second cfID in the list is 9239, which has 87 coins. This number will be com
 This section outputs a list of TRUES/FALSES in the same order as the coin finds are originally listed in the "in.radius" list. This list goes into the "are.num.coins.same" column. The output for our example would be c(TRUE, FALSE). 
 
 There is also a column (dif.num.coins) for the list of the differences between the central coin find and the radius coin finds (central cf - radius cf = 13293 - 9239 = 534 - 87 = 447)
-The final output in the column will be c(0, 447)
+
+The final output in the column will be c(0, 447).
 
 ***Hereafter, I will not do the 13293 to 13293 comparison. This understood comparison will always yield a TRUE as the first term of the output lists. 
 
@@ -81,66 +82,66 @@ The tolerance for this cluster works differently than the others. Within a coin 
 
 Now for the comparisons, 13293 is still the central find, and 9239 is the radius find:
 
-13293 has 533 gold coins and 9239 has 0 gold coins. (FALSE)
-13293 has 0 silver coins and 9239 has 0 silver coins. (TRUE)
-13293 has 1 bronze coin and 9239 has 87 bronze coins. (FALSE)
-13293 has 0 lead coins and 9239 has 0 lead coins. (TRUE)
+- 13293 has 533 gold coins and 9239 has 0 gold coins. (FALSE)
+- 13293 has 0 silver coins and 9239 has 0 silver coins. (TRUE)
+- 13293 has 1 bronze coin and 9239 has 87 bronze coins. (FALSE)
+- 13293 has 0 lead coins and 9239 has 0 lead coins. (TRUE)
 
 In this module, I also calculate the difference between the amount of coins for each metal between the central and radius coin finds. Here's what this looks like with our example (13293 - 9239 = central cf - radius cf): 
 
-Gold: 533 - 0 = 533
-Silver: 0 - 0 = 0
-Bronze: 1 - 87 = -86
-Lead: 0 - 0 = 0
+- Gold: 533 - 0 = 533
+- Silver: 0 - 0 = 0
+- Bronze: 1 - 87 = -86
+- Lead: 0 - 0 = 0
 
 This module produces the following columns with the following example outputs:
-is.bronze.same: c(TRUE, FALSE)
-is.gold.same: c(TRUE, FALSE)
-is.silver.same: c(TRUE, TRUE)
-is.lead.same: c(TRUE, TRUE)
+- is.bronze.same: c(TRUE, FALSE)
+- is.gold.same: c(TRUE, FALSE)
+- is.silver.same: c(TRUE, TRUE)
+- is.lead.same: c(TRUE, TRUE)
 
-dif.silver = c(0, 533)
-dif.gold = c(0,0)
-dif.bronze = c(0, -86)
-dif.lead = c(0,0)
+- dif.silver = c(0, 533)
+- dif.gold = c(0,0)
+- dif.bronze = c(0, -86)
+- dif.lead = c(0,0)
 
 These are the column names for the total metal columns:
-total.gold = 
-total.silver = 
-total.bronze = 
-total.silver = 
+- total.gold = 
+- total.silver = 
+- total.bronze = 
+- total.silver = 
 
 
 ### (FIVE) Excavation Filter
 The dates of the excavation start and end years are compared seperately between the central coin find and each radius coin find. 
 The same comparison occurs here as well for the variable excav.start.year and excav.end.year for each coin find in the cluster. The tolerance for this comparison is currently set to 2.
 
-13293's excavation started in 2005, and 9239's started in 1969. (FALSE)
-13293's excavation ended in 1968, and 9239's ended in 2010. (FALSE)
+- 13293's excavation started in 2005, and 9239's started in 1969. (FALSE)
+- 13293's excavation ended in 1968, and 9239's ended in 2010. (FALSE)
 
 Therefore, this module produces two lists
-are.excav.start.same = c(TRUE, FALSE)
-are.excav.end.same = c(TRUE, FALSE)
+- are.excav.start.same = c(TRUE, FALSE)
+- are.excav.end.same = c(TRUE, FALSE)
 
 NOTE: Alternative outputs are:
-NA: This occurs when the central coin find has NA for the start year or the end year
-NA as the component of a list (ex. c(0, 67, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
+- NA: This occurs when the central coin find has NA for the start year or the end year.
+- NA as the component of a list (ex. c(0, 67, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
 
 
 ### (SIX) Date Range Filter
 The dates of the start and end years of a coin find are compared seperately between the central coin find and each radius coin find. 
 The same comparison occurs here as well for the variable is.cf.start.year.same and is.cf.end.year.same for each coin find in the cluster. The tolerance for this comparison is 2.
 
-13293's excavation started in 582, and 9239's started in -300. (FALSE)
-13293's excavation ended in 685, and 9239's ended in 750. (FALSE)
+- 13293's excavation started in 582, and 9239's started in -300. (FALSE)
+- 13293's excavation ended in 685, and 9239's ended in 750. (FALSE)
 
 Therefore, this module produces two lists
-is.cf.start.year.same = c(TRUE, FALSE)
-is.cf.end.year.same = c(TRUE, FALSE)
+- is.cf.start.year.same = c(TRUE, FALSE)
+- is.cf.end.year.same = c(TRUE, FALSE)
 
 Then, it also produces to difference lists:
-start.date.dif = c(0, 882)
-end.date.dife = c(0, -65)
+- start.date.dif = c(0, 882)
+- end.date.dife = c(0, -65)
 
 NOTE: Alternative outputs are:
 NA: This occurs when the central coin find has NA for the start year or the end year
@@ -161,14 +162,14 @@ Then I created a cluster ID for each geographical cluster. It is composed of the
 ### (NINE & TEN & ELEVEN) Create Cluster Comparison Data Frame (FULL_clusters)
 Now, I created a new data frame (FULL_clusters) with new metrics to help make comparisons between the clusters better. I include the following information in this data frame:
 
--cfID, name (long name assigned to find), author (person who inputted the find)
--cluster ID
--radius = the radius the geographical cluster is in (set to 1 for all)
+- cfID, name (long name assigned to find), author (person who inputted the find)
+- cluster ID
+- radius = the radius the geographical cluster is in (set to 1 for all)
 
 After this indentifying material, I cycle through the same three types of columns for each metric:
--total.gold / silver / bronze / lead
--start/end.year
--excav.start/end.year
+- total.gold / silver / bronze / lead
+- start/end.year
+- excav.start/end.year
 
 I have columns for three metric:
 -I list the value itself (ex. total.gold, excavation start year)
