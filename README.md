@@ -172,13 +172,13 @@ After this indentifying material, I cycle through the same three types of column
 - excav.start/end.year
 
 I have columns for three metric:
--I list the value itself (ex. total.gold, excavation start year)
+- I list the value itself (ex. total.gold, excavation start year)
 
--avg.X.dif = sum(central find - each radius find)
+- avg.X.dif = sum(central find - each radius find)
 ex. avg.bronze.dif = (0-86)/(2-1) =  -86
 NOTE = the bronze difference list is c(0, -86). By subtracting one from the denominator, we don't consider the 0 from 13293 being subtracted from itself.
 
--percent.X.same = percent of the values in the TRUE/FALSE list that are TRUE (excluding the value that is true because the central coin find is compared to itself)
+- percent.X.same = percent of the values in the TRUE/FALSE list that are TRUE (excluding the value that is true because the central coin find is compared to itself)
 ex. For avg.bronze.dif of 13293 = (1/(2-1)) = 0% 
 NOTE = the bronze TRUE/FALSE list is c(TRUE,FALSE). By subtracting one from the denominator, we don't consider the TRUE from 13293 being compared to itself.
 
