@@ -27,7 +27,7 @@ Now, I will walk through the program using some example coin finds. The code is 
 | 13293 | 533        |              |   1          |            |
 | 9239  |            |              |   87         |            |
 
-***The date ranges for coins in the coin find data fram sometimes have inconsistent dates. I will soon be correcting this by reconstructing the correct date from the coin group data frame. 
+***The date ranges for coins in the coin find data frame sometimes have inconsistent dates. I will soon be correcting this by reconstructing the correct date from the coin group data frame. 
 
 ### (ONE) Replacing NAs and Striking Coin Finds
 There are a few coin finds that have NAs listed for the number of coins found. To rememdy this, I totaled the coin amounts listed for each coin group and replaced the NA with this total. 
