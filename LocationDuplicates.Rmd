@@ -12,6 +12,7 @@ library(tidyverse)
 library(sf)
 library(readxl)
 library(writexl)
+library(multicon)
 ```
 
 Read in Data (Download Date: )
@@ -127,11 +128,13 @@ CF_to_CG = function(cf_IDs) {
 ```
 
 
-(ONE) 
+PROCESSING
+(ONE A) 
 Filling in NAs in cf_num_coins_found with amounts in CoinGroups dataframe (though some coin amounts in CoinGroups are also NA).
 A few categories of coin groups and coin finds get struck:
 - If cf_num_coins_found==NA or 0 after this reformatting
 - cg_num_coins_found==NA or 0 still after this reformatting
+    *NOTE = if this operation is done there are no longer coin groups listed with a coin find in the CG dataframe, these coin finds are excised from the dataframe (amounts to 60)
 - Coin Groups where metal == NA
 -everything with THS in the name
 ```{r}
@@ -152,8 +155,7 @@ for( i in c(1:nrow(CoinFinds))) {
   
 }
 
-
-# taking out rows where cf_num_coins_found is equal to 0 and cg_num_coins_found
+# taking out rows where cf_num_coins_found is equal to 0 and cg_num_coins_found is 0
 CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found != 0 & !is.na(CoinFinds$cf_num_coins_found),]
 
 # taking out rows where cg_num_coins_found is equal to 0 and cg_num_coins_found
@@ -165,9 +167,48 @@ CoinGroups = CoinGroups %>% drop_na(metal)
 #taking out everything with THS
 CoinFinds = CoinFinds[!grepl("THS-", CoinFinds$cf_name),]
 CoinGroups = CoinGroups[!grepl("THS-", CoinGroups$cf_name),]
+```
 
+(ONE B)
+```{r}
+
+# Reconstruct the total number of coins by summing up the silver, gold, bronze, and lead across a coin find's coin groups
+# Reconstruct start and end dates from the lowest and highest respectively of dates listed among a cf's cgs. 
+CoinFinds$total.gold = NA
+CoinFinds$total.silver = NA
+CoinFinds$total.bronze = NA
+CoinFinds$total.lead = NA
+for (z in c(1:cf_nrow)) {
+  index = z
+  
+  # get the cgIDs corresponding to central cf
+  point_ID = CoinFinds$ID[index]
+  point_CGs = CoinGroups[CoinGroups$cfID==point_ID,]
+  
+  #sum up amount of coins of each metal for a coin find
+  point_silver = sum(point_CGs$cg_num_coins[point_CGs$metal=="Silver"])
+  point_gold = sum(point_CGs$cg_num_coins[point_CGs$metal=="Gold"])
+  point_bronze = sum(point_CGs$cg_num_coins[point_CGs$metal=="Bronze"])
+  point_lead = sum(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
+ 
+  CoinFinds$total.gold[index] = point_gold
+  CoinFinds$total.silver[index] = point_silver
+  CoinFinds$total.bronze[index] = point_bronze
+  CoinFinds$total.lead[index] = point_lead
+  CoinFinds$cf_num_coins_found[index] = point_gold + point_silver + point_bronze + point_lead 
+  
+  #This will throw up an error about infinity, but I'm cutting out those coin finds in a few lines
+  best_start_date = min(point_CGs$cg_start_year)
+  best_end_date = max(point_CGs$cg_end_year)
+  
+  CoinFinds$cf_start_year[index] = best_start_date
+  CoinFinds$cf_end_year[index] = best_end_date }
+
+#Taking out coin finds that no longer have coin groups associated with them
+CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found!=0,]
 
 ```
+
 
 (TWO)
 Location Filter: For each coin find location, return all coin finds within a certain radius (that you input) in a list, forming a column of CoinFinds
@@ -199,6 +240,7 @@ for (i in c(1:cf_nrow)) {
   
   #  filter records within the RADIUS specified
   target_sf2 <- target_sf %>%
+    #compare between the point and target to see if they are a duplicate?
     mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
     filter(Dist <= RADIUS)
   
@@ -266,7 +308,7 @@ for (z in c(1:cf_nrow)) {
 ```
 
 (FOUR)
-***Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of the difference in metal amounts between the central coin find and each radius coin find.
+Metal Filter: Uses amount of each metal in a coin find and compares this between the central coin find and the radius coin finds. Generates TRUE/FALSE list like above that's added to Cut_CoinFinds. Also generates columns of the difference in metal amounts between the central coin find and each radius coin find.
 ```{r}
 
 # creating columns for each metal type in Cut_CoinFinds
@@ -281,11 +323,6 @@ Cut_CoinFinds$dif.bronze = NA
 
 Cut_CoinFinds$is.lead.same = NA
 Cut_CoinFinds$dif.lead = NA
-  
-Cut_CoinFinds$total.gold = NA
-Cut_CoinFinds$total.silver = NA
-Cut_CoinFinds$total.bronze = NA
-Cut_CoinFinds$total.lead = NA
 
 for (z in c(1:cf_nrow)) {
   index = z
@@ -307,11 +344,6 @@ for (z in c(1:cf_nrow)) {
   point_lead = sum(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
   point_num_lead = length(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
  
-  Cut_CoinFinds$total.gold[index] = point_gold
-  Cut_CoinFinds$total.silver[index] = point_silver
-  Cut_CoinFinds$total.bronze[index] = point_bronze
-  Cut_CoinFinds$total.lead[index] = point_lead
-  
   #get radius IDs
   rad.IDs = Cut_CoinFinds$in.radius[index][[1]]
   
@@ -405,8 +437,10 @@ END_RANGE = 2
 
 Cut_CoinFinds$are.excav.start.same = NA
 Cut_CoinFinds$are.excav.end.same = NA
+Cut_CoinFinds$exstart.date.dif = NA
+Cut_CoinFinds$exend.date.dif = NA
 
-for (z in c(1:nrow(Cut_CoinFinds))) {
+for (z in c(1:cf_nrow)) {
   index = z
 
   if(is.na(Cut_CoinFinds$cf_excavation_start[index])) {
@@ -429,31 +463,43 @@ for (z in c(1:nrow(Cut_CoinFinds))) {
 
   are.excav.start.same = rep(NULL, length(numCoinsList))
   are.excav.end.same = rep(NULL, length(numCoinsList))
+  exstart.date.dif = rep(NULL, length(numCoinsList))
+  exend.date.dif = rep(NULL, length(numCoinsList))
   for (o in c(1:length(excav_end_list))) {
     
     # testing if start year same within range
      if (is.na(excav_start_list[o])) {
-      are.num.coins.same[o] = NA
+      are.excav.start.same[o] = NA
+      exstart.date.dif[o] = NA
       }
     else if (excav_start_list[o] <= (excav_start+START_RANGE) & excav_start_list[o] >= (excav_start-START_RANGE)) {
-      are.excav.start.same[o] = TRUE } 
+      are.excav.start.same[o] = TRUE
+      exstart.date.dif[o] = excav_start - excav_start_list[o]
+      } 
     else {
-      are.excav.start.same[o] = FALSE  }
+      are.excav.start.same[o] = FALSE 
+      exstart.date.dif[o] = excav_start - excav_start_list[o]}
     
     # testing if end year same within range
      if (is.na(excav_end_list[o])) {
       are.excav.end.same[o] = NA
+      exend.date.dif[o] = NA
       }
-    else if (excav_end_list[o] <= (excav_start+START_RANGE) & excav_start_list[o] >= (excav_start-START_RANGE)) {
-      are.excav.end.same[o] = TRUE} 
+    else if (excav_end_list[o] <= (excav_end+END_RANGE) & excav_end_list[o] >= (excav_end-END_RANGE)) {
+      are.excav.end.same[o] = TRUE
+      exend.date.dif[o] = excav_end - excav_end_list[o]
+      } 
     else {
-      are.excav.end.same[o] = FALSE  }
+      are.excav.end.same[o] = FALSE
+      exend.date.dif[o] = excav_end - excav_end_list[o]}
     
     }
 
   Cut_CoinFinds$are.excav.start.same[index] = I(list(are.excav.start.same))
   Cut_CoinFinds$are.excav.end.same[index] = I(list(are.excav.end.same))
-
+  
+  Cut_CoinFinds$exstart.date.dif[index] = I(list(exstart.date.dif))
+  Cut_CoinFinds$exend.date.dif[index] = I(list(exend.date.dif))
 }
 
 ```
@@ -585,7 +631,10 @@ for (i in c(1:nrow(TEST_CoinFinds))) {
 FULL_clusters = dataframe with clusterID, cfID of the central cf, name of central coin find
 (This dataframe will have duplicates of clusterIDs)
 ```{r}
-FULL_clusters = data.frame(cfID = TEST_CoinFinds$ID, name = TEST_CoinFinds$cf_name, author = TEST_CoinFinds$cf_user, clusterID = TEST_CoinFinds$clusterID, 
+FULL_clusters = data.frame(cfID = TEST_CoinFinds$ID, 
+                           name = TEST_CoinFinds$cf_name, 
+                           author = TEST_CoinFinds$cf_user, 
+                           clusterID = TEST_CoinFinds$clusterID, 
                            total.gold = TEST_CoinFinds$total.gold,
                            total.silver = TEST_CoinFinds$total.silver,
                            total.bronze = TEST_CoinFinds$total.bronze,
@@ -593,7 +642,9 @@ FULL_clusters = data.frame(cfID = TEST_CoinFinds$ID, name = TEST_CoinFinds$cf_na
                            
                            total.coins = TEST_CoinFinds$cf_num_coins_found,
                            start.year = TEST_CoinFinds$cf_start_year,
-                           end.year = TEST_CoinFinds$cf_end_year)
+                           end.year = TEST_CoinFinds$cf_end_year,
+                           excav.start = TEST_CoinFinds$cf_excavation_start,
+                           excav.end = TEST_CoinFinds$cf_excavation_end)
 FULL_clusters$radius = rep(RADIUS, nrow(FULL_clusters))
 ```
 
@@ -611,6 +662,15 @@ FULL_clusters$avg.start.date.dif = NA
 
 FULL_clusters$percent.end.date.same = NA
 FULL_clusters$avg.end.date.dif = NA
+
+#################
+## Excav start and ends
+FULL_clusters$percent.exstart.same = NA
+FULL_clusters$avg.exstart.dif = NA
+
+FULL_clusters$percent.exend.same = NA
+FULL_clusters$avg.exend.dif = NA
+#################
 
 #metals
 FULL_clusters$percent.silver.same = NA
@@ -638,39 +698,50 @@ for (i in c(1:nrow(FULL_clusters))) {
   FULL_clusters$avg.coin.num.dif[i] = sum(coin.difs)/(length(coin.difs)-1)
 }
 
-
+### COIN DATE RANGES
 #start date range
-
 for (i in c(1:nrow(FULL_clusters))) {
   index = i
   FULL_id = FULL_clusters$cfID[index]
   FULL_FULL = Cut_CoinFinds[Cut_CoinFinds$ID == FULL_id,]
+  
   num.starts = unlist(FULL_FULL$is.cf.start.year.same[1][1])
   start.date.difs = unlist(FULL_FULL$start.date.di[1][1])
   
   FULL_clusters$percent.start.date.same[index] = ((length(num.starts[num.starts==TRUE])-1)/FULL_FULL$num.in.radius)*100
-  
   FULL_clusters$avg.start.date.dif[i] = sum(start.date.difs)/(length(start.date.difs)-1)
-  
-}
-
-#end date range
-
-for (i in c(1:nrow(FULL_clusters))) {
-  index = i
-  FULL_id = FULL_clusters$cfID[index]
-  FULL_FULL = Cut_CoinFinds[Cut_CoinFinds$ID == FULL_id,]
   
   num.ends = unlist(FULL_FULL$is.cf.end.year.same[1][1])
   end.date.difs = unlist(FULL_FULL$end.date.dif[1][1])
   
   FULL_clusters$percent.end.date.same[index] = ((length(num.ends[num.ends==TRUE])-1)/FULL_FULL$num.in.radius)*100
   FULL_clusters$avg.end.date.dif[i] = sum(end.date.difs)/(length(end.date.difs)-1)
+  
 }
 
 
-###metals
+### EXCAVATIONS
+for (i in c(1:nrow(FULL_clusters))) {
+  index = i
+  FULL_id = FULL_clusters$cfID[index]
+  FULL_FULL = Cut_CoinFinds[Cut_CoinFinds$ID == FULL_id,]
 
+  num.starts = unlist(FULL_FULL$are.excav.start.same[1][1])
+  exstart.date.difs = unlist(FULL_FULL$exstart.date.dif[1][1])
+
+  FULL_clusters$percent.exstart.same[index] = ((length(num.starts[num.starts==TRUE])-1)/FULL_FULL$num.in.radius)*100
+  FULL_clusters$avg.exstart.dif[i] = sum(exstart.date.difs)/(length(exstart.date.difs)-1)
+
+  num.ends = unlist(FULL_FULL$are.excav.end.same[1][1])
+  exend.date.difs = unlist(FULL_FULL$exend.date.dif[1][1])
+
+  FULL_clusters$percent.exend.same[index] = ((length(num.ends[num.ends==TRUE])-1)/FULL_FULL$num.in.radius)*100
+  FULL_clusters$avg.exend.dif[i] = sum(exend.date.difs)/(length(exend.date.difs)-1)
+
+}
+
+
+###METALS
 for (i in c(1:nrow(FULL_clusters))) {
   index = i
   FULL_id = FULL_clusters$cfID[index]
@@ -709,52 +780,150 @@ col_order <- c("cfID", "name", "author", "clusterID", "radius",
                "total.bronze", "avg.bronze.dif", "percent.bronze.same", 
                "total.lead", "avg.lead.dif", "percent.lead.same", 
                "start.year", "avg.start.date.dif", "percent.start.date.same",
-               "end.year", "avg.end.date.dif", "percent.end.date.same")
+               "end.year", "avg.end.date.dif", "percent.end.date.same",
+               "excav.start", "avg.exstart.dif", "percent.exstart.same",
+               "excav.end", "avg.exend.dif", "percent.exend.same")
 FULL_clusters <- FULL_clusters[, col_order]
 ```
 
-(TWELVE)
-Adding one more column to FULL_clusters:
-Match Score
-```{r}
-FULL_clusters$how.many.matches = NA
+Manual Matching spread sheet
+```{r message=TRUE}
 
+Verify_Dupes = data.frame(
+  central_cf = NA,
+  radius_cf = NA
+)
+
+
+verID = 1
 for (i in c(1:nrow(FULL_clusters))) {
-  counter = 0
+  full = i
+  Verify_Dupes$central_cf[verID] = FULL_clusters$cfID[full]
+  cluster.list = strsplit(FULL_clusters$clusterID[full], ".", fixed=T)
+  rows = length(cluster.list[[1]])
   
-  if (FULL_clusters$percent.num.coins.same[i] > 0) {
-    counter = counter+1
-  }
+  new = data.frame(central_cf = rep(NA, rows), radius_cf = rep(NA, rows))
   
-  if (FULL_clusters$percent.start.date.same[i] > 0) {
-    counter = counter+1
-  }
+  Verify_Dupes = rbind(Verify_Dupes, new)
+
+  verID = verID + rows
   
-  if (FULL_clusters$percent.end.date.same[i] > 0) {
-    counter = counter+1
-  }
-  
-  if (FULL_clusters$percent.silver.same[i]>0 & FULL_clusters$is.silver.zero[i]==FALSE) {
-    counter = counter+1
-  }
-  
-  if (FULL_clusters$percent.gold.same[i]>0 & FULL_clusters$is.gold.zero[i]==FALSE) {
-    counter = counter+1
-  }
-  
-  if (FULL_clusters$percent.lead.same[i]>0 & FULL_clusters$is.lead.zero[i]==FALSE) {
-    counter = counter+1
-  }
-  
-  if (FULL_clusters$percent.bronze.same[i]>0 & FULL_clusters$is.bronze.zero[i]==FALSE) {
-    counter = counter+1
-  }
-  
-  FULL_clusters$how.many.matches[i] = counter
 }
+
+verID = 1
+for (i in c(1:nrow(FULL_clusters))) {
+  full = i
+  
+  cluster.list = strsplit(FULL_clusters$clusterID[full], ".", fixed=T)
+  rows = length(cluster.list[[1]])
+  
+  key = Verify_Dupes$central_cf[verID]
+  Verify_Dupes$radius_cf[verID] = cluster.list[[1]][1]
+  
+  for(cent in c(1:rows)){
+    Verify_Dupes$central_cf[(cent+verID)-1] = key
+    if (cent>1){ 
+      Verify_Dupes$radius_cf[(cent+verID)-1] = cluster.list[[1]][cent]
+    
+    }
+  }
+  
+  verID = verID + rows
+}
+
+Verify_Dupes = Verify_Dupes[1:(nrow(Verify_Dupes)-1),]
 
 
 ```
+
+(TWELVE)
+Match Score
+-silver
+-gold
+-bronze
+- start and end year 
+G, S, B, SD, ED, EXS, EXE
+```{r}
+
+Verify_Dupes$G = NA
+Verify_Dupes$S = NA
+Verify_Dupes$B = NA
+Verify_Dupes$SD = NA
+Verify_Dupes$ED = NA
+Verify_Dupes$EXS = NA
+Verify_Dupes$EXE = NA
+
+for (i in c(1:nrow(Verify_Dupes))) {
+  index = i
+  
+  central_info = Cut_CoinFinds[Cut_CoinFinds$ID==Verify_Dupes$central_cf[index],]
+  radius = Verify_Dupes$radius_cf[index]
+  radius_index = which(c(central_info$in.radius[[1]]) == as.integer(radius))
+  
+  Verify_Dupes$G[index] = central_info$is.gold.same[1][[1]][radius_index]
+  Verify_Dupes$S[index] = central_info$is.silver.same[1][[1]][radius_index]
+  Verify_Dupes$B[index] = central_info$is.bronze.same[1][[1]][radius_index]
+  Verify_Dupes$SD[index] = central_info$is.cf.start.year.same[1][[1]][radius_index]
+  Verify_Dupes$ED[index] = central_info$is.cf.end.year.same[1][[1]][radius_index]
+  Verify_Dupes$EXS[index] = central_info$are.excav.start.same[1][[1]][radius_index]
+  Verify_Dupes$EXE[index] = central_info$are.excav.end.same[1][[1]][radius_index]
+}
+
+Verify_Dupes$G = as.integer(Verify_Dupes$G)
+Verify_Dupes$S = as.integer(Verify_Dupes$S)
+Verify_Dupes$B = as.integer(Verify_Dupes$B)
+Verify_Dupes$SD = as.integer(Verify_Dupes$SD)
+Verify_Dupes$ED = as.integer(Verify_Dupes$ED)
+Verify_Dupes$EXS = as.integer(Verify_Dupes$EXS)
+Verify_Dupes$EXE = as.integer(Verify_Dupes$EXE)
+
+if (!is.na(Verify_Dupes$EXS) & !is.na(Verify_Dupes$EXE)) {
+  composites = composite(Verify_Dupes[,3:9])
+} else if (!is.na(Verify_Dupes$EXS)) {
+  composites = composite(Verify_Dupes[,c("G", "S", "B", "SD", "SE", "EXS")])
+} else if (!is.na(Verify_Dupes$EXE)) {
+  composites = composite(Verify_Dupes[,3:c("G", "S", "B", "SD", "SE", "EXE")])
+} else {
+  composites = composite(Verify_Dupes[,3:7])
+}
+    
+Verify_Dupes$match.score = NA
+for (i in c(1:nrow(Verify_Dupes))) {
+  Verify_Dupes$match.score[i] = composites[i]
+}
+
+Verify_Dupes$test = NA
+#Removing Duplicates
+for (ex in c(1:nrow(Verify_Dupes))) {
+  if(as.integer(Verify_Dupes$central_cf[ex]) == as.integer(Verify_Dupes$radius_cf[ex])){
+    Verify_Dupes = Verify_Dupes[-ex,]
+  }
+  
+  perm.test = c(as.integer(Verify_Dupes$central_cf[ex]), as.integer(Verify_Dupes$radius_cf[ex]))
+  perm.test = sort(perm.test)
+  perm.test = toString(perm.test)
+  Verify_Dupes$test[ex] = perm.test
+}
+
+for (o in c(1:nrow(Verify_Dupes))) {
+  if(as.integer(Verify_Dupes$central_cf[o]) == as.integer(Verify_Dupes$radius_cf[o])){
+    Verify_Dupes = Verify_Dupes[-o,]
+  }
+
+}
+
+Verify_Dupes = Verify_Dupes[!duplicated(Verify_Dupes[,c('test')]),]
+Verify_Dupes = data.frame(central_cf = Verify_Dupes$central_cf, radius_cf = Verify_Dupes$radius_cf, match.score = Verify_Dupes$match.score)
+
+#Verify_Dupes$yes.no = NA
+
+
+```
+
+
+
+
+
 
 #############
 OUTPUTS:
@@ -770,6 +939,18 @@ in each cluster and avg difference (central find - radius find) between attribut
 ```{r}
 write_xlsx(FULL_clusters,"/cloud/project/Possible_Duplicates.xlsx")
 ```
+
+Excel spread sheet for manual matching
+```{r}
+write_xlsx(Verify_Dupes,"/cloud/project/VerifyDuplicates.xlsx")
+```
+
+
+List of Coin Finds that were cut
+```{r}
+
+```
+
 
 
 #####
@@ -870,7 +1051,78 @@ cluster = cluster_info("7920.7921.13298.13299")
 write_xlsx(cluster,"/cloud/project/cluster.xlsx")
 ```
 
+Match Score draft
+```{r}
+#Adding one more column to FULL_clusters:
+#Match Score
+FULL_clusters$how.many.matches = NA
 
+for (i in c(1:nrow(FULL_clusters))) {
+  counter = 0
+  
+  if (FULL_clusters$percent.num.coins.same[i] > 0) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.start.date.same[i] > 0) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.end.date.same[i] > 0) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.silver.same[i]>0 & FULL_clusters$is.silver.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.gold.same[i]>0 & FULL_clusters$is.gold.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.lead.same[i]>0 & FULL_clusters$is.lead.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  if (FULL_clusters$percent.bronze.same[i]>0 & FULL_clusters$is.bronze.zero[i]==FALSE) {
+    counter = counter+1
+  }
+  
+  FULL_clusters$how.many.matches[i] = counter
+}
+
+```
+
+```{r}
+# verID = 1
+# #nrow(FULL_clusters)
+# for (i in c(1:30)) {
+#   full = i
+# 
+#   #put central find in row
+#   Verify_Dupes$central_cf[verID] = FULL_clusters$cfID[full]
+#   
+#   # make list of cluster IDs  
+#   cluster.list = strsplit(FULL_clusters$clusterID[full], ".", fixed=T)
+#   for (l in c(1:length(cluster.list[[1]]))){
+#     x = l
+#     # put rad ID in row
+#     Verify_Dupes$radius_cf[verID] = cluster.list[[1]][[x]]
+#     #print(Verify_Dupes$radius_cf[verID-1])
+#   
+#     if(x != (length(cluster.list)-1) & x != (length(cluster.list))) {
+#       verID = verID + 1
+#       Verify_Dupes[nrow(Verify_Dupes) + 1, ] <- c(NA, NA)
+#       Verify_Dupes$central_cf[verID] = FULL_clusters$cfID[full] }
+#     
+#   }
+#   
+#   #add new row to Verify Duplicates
+#   verID = verID + 1
+#   Verify_Dupes[nrow(Verify_Dupes) + 1, ] <- c(NA, NA)
+#     
+#   }
+```
 
 
 
