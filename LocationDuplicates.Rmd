@@ -786,7 +786,14 @@ col_order <- c("cfID", "name", "author", "clusterID", "radius",
 FULL_clusters <- FULL_clusters[, col_order]
 ```
 
-Manual Matching spread sheet
+
+(TWELVE)
+Match Score
+-silver
+-gold
+-bronze
+- start and end year 
+G, S, B, SD, ED, EXS, EXE
 ```{r message=TRUE}
 
 Verify_Dupes = data.frame(
@@ -833,18 +840,6 @@ for (i in c(1:nrow(FULL_clusters))) {
 
 Verify_Dupes = Verify_Dupes[1:(nrow(Verify_Dupes)-1),]
 
-
-```
-
-(TWELVE)
-Match Score
--silver
--gold
--bronze
-- start and end year 
-G, S, B, SD, ED, EXS, EXE
-```{r}
-
 Verify_Dupes$G = NA
 Verify_Dupes$S = NA
 Verify_Dupes$B = NA
@@ -853,6 +848,7 @@ Verify_Dupes$ED = NA
 Verify_Dupes$EXS = NA
 Verify_Dupes$EXE = NA
 
+# Fill in true and falses 
 for (i in c(1:nrow(Verify_Dupes))) {
   index = i
   
@@ -869,6 +865,7 @@ for (i in c(1:nrow(Verify_Dupes))) {
   Verify_Dupes$EXE[index] = central_info$are.excav.end.same[1][[1]][radius_index]
 }
 
+#convert trues and falses into integers
 Verify_Dupes$G = as.integer(Verify_Dupes$G)
 Verify_Dupes$S = as.integer(Verify_Dupes$S)
 Verify_Dupes$B = as.integer(Verify_Dupes$B)
@@ -876,41 +873,45 @@ Verify_Dupes$SD = as.integer(Verify_Dupes$SD)
 Verify_Dupes$ED = as.integer(Verify_Dupes$ED)
 Verify_Dupes$EXS = as.integer(Verify_Dupes$EXS)
 Verify_Dupes$EXE = as.integer(Verify_Dupes$EXE)
+```
 
-if (!is.na(Verify_Dupes$EXS) & !is.na(Verify_Dupes$EXE)) {
-  composites = composite(Verify_Dupes[,3:9])
-} else if (!is.na(Verify_Dupes$EXS)) {
-  composites = composite(Verify_Dupes[,c("G", "S", "B", "SD", "SE", "EXS")])
-} else if (!is.na(Verify_Dupes$EXE)) {
-  composites = composite(Verify_Dupes[,3:c("G", "S", "B", "SD", "SE", "EXE")])
-} else {
-  composites = composite(Verify_Dupes[,3:7])
-}
-    
+```{r message=TRUE}
+#compute match scores
+
+#fill match scores into the spread sheet
 Verify_Dupes$match.score = NA
 for (i in c(1:nrow(Verify_Dupes))) {
-  Verify_Dupes$match.score[i] = composites[i]
+  
+  if (!is.na(Verify_Dupes$EXS[i]) & !is.na(Verify_Dupes$EXE[i])) {
+  composites = composite(Verify_Dupes[i,3:9])
+} else if (!is.na(Verify_Dupes$EXS[i])) {
+  composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD", "ED", "EXS")])
+} else if (!is.na(Verify_Dupes$EXE[i])) {
+  composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD", "ED", "EXE")])
+} else {
+  composites = composite(Verify_Dupes[i,3:7])
+}
+  
+  Verify_Dupes$match.score[i] = composites
 }
 
 Verify_Dupes$test = NA
+Verify_Dupes = Verify_Dupes[as.integer(Verify_Dupes$central_cf) != as.integer(Verify_Dupes$radius_cf),]
 #Removing Duplicates
 for (ex in c(1:nrow(Verify_Dupes))) {
-  if(as.integer(Verify_Dupes$central_cf[ex]) == as.integer(Verify_Dupes$radius_cf[ex])){
-    Verify_Dupes = Verify_Dupes[-ex,]
-  }
-  
+  print(ex)
+  # if(as.integer(Verify_Dupes$central_cf[ex]) == as.integer(Verify_Dupes$radius_cf[ex])){
+  #   Verify_Dupes = Verify_Dupes[-ex,]
+  # }
+
   perm.test = c(as.integer(Verify_Dupes$central_cf[ex]), as.integer(Verify_Dupes$radius_cf[ex]))
   perm.test = sort(perm.test)
   perm.test = toString(perm.test)
   Verify_Dupes$test[ex] = perm.test
 }
 
-for (o in c(1:nrow(Verify_Dupes))) {
-  if(as.integer(Verify_Dupes$central_cf[o]) == as.integer(Verify_Dupes$radius_cf[o])){
-    Verify_Dupes = Verify_Dupes[-o,]
-  }
-
-}
+Verify_Dupes = Verify_Dupes[as.integer(Verify_Dupes$central_cf) != as.integer(Verify_Dupes$radius_cf),]
+  
 
 Verify_Dupes = Verify_Dupes[!duplicated(Verify_Dupes[,c('test')]),]
 Verify_Dupes = data.frame(central_cf = Verify_Dupes$central_cf, radius_cf = Verify_Dupes$radius_cf, match.score = Verify_Dupes$match.score)
@@ -919,10 +920,6 @@ Verify_Dupes = data.frame(central_cf = Verify_Dupes$central_cf, radius_cf = Veri
 
 
 ```
-
-
-
-
 
 
 #############
