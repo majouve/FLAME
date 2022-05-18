@@ -914,7 +914,7 @@ Verify_Dupes = Verify_Dupes[as.integer(Verify_Dupes$central_cf) != as.integer(Ve
   
 
 Verify_Dupes = Verify_Dupes[!duplicated(Verify_Dupes[,c('test')]),]
-Verify_Dupes = data.frame(central_cf = Verify_Dupes$central_cf, radius_cf = Verify_Dupes$radius_cf, match.score = Verify_Dupes$match.score)
+#Verify_Dupes = data.frame(central_cf = Verify_Dupes$central_cf, radius_cf = Verify_Dupes$radius_cf, match.score = Verify_Dupes$match.score)
 
 #Verify_Dupes$yes.no = NA
 
