@@ -2,6 +2,13 @@
 title: "LocationDuplicates"
 output: html_document
 ---
+ADD:
+-AUTHORS
+-X NO THS X
+-CHRE, user(PeterPhilips), PAS
+
+histogram of dates over number of coins minted per 25 years
+-
 
 ```{r}
 library(dplyr)
@@ -13,6 +20,8 @@ library(sf)
 library(readxl)
 library(writexl)
 library(multicon)
+
+library(ks)
 ```
 
 Read in Data (Download Date: )
@@ -22,8 +31,8 @@ CoinGroups = read.csv("CoinGroups.csv")
 Coin_Info = read_excel("Coin_info.xlsx", sheet="Denominations")
 
 # # Disconsidered Coin Find excel sheet labeled Not_A_Duplicate.xlsx
-# disconsidered = read.csv("Not_A_Duplicate.xlsx")
-# CoinFinds = CoinFinds[CoinFinds$ID %!in% disconsidered$ID, ]
+disconsidered = read_excel("Not_A_Duplicate.xlsx")
+old_VerDupes = read_excel("VerifyDuplicates.xlsx")
 
 ```
 
@@ -798,7 +807,9 @@ G, S, B, SD, ED, EXS, EXE
 
 Verify_Dupes = data.frame(
   central_cf = NA,
-  radius_cf = NA
+  central_name = NA,
+  radius_cf = NA,
+  radius_name = NA
 )
 
 
@@ -809,7 +820,7 @@ for (i in c(1:nrow(FULL_clusters))) {
   cluster.list = strsplit(FULL_clusters$clusterID[full], ".", fixed=T)
   rows = length(cluster.list[[1]])
   
-  new = data.frame(central_cf = rep(NA, rows), radius_cf = rep(NA, rows))
+  new = data.frame(central_cf = rep(NA, rows), central_name = rep(NA, rows), radius_cf = rep(NA, rows), radius_name = rep(NA, rows))
   
   Verify_Dupes = rbind(Verify_Dupes, new)
 
@@ -873,7 +884,155 @@ Verify_Dupes$SD = as.integer(Verify_Dupes$SD)
 Verify_Dupes$ED = as.integer(Verify_Dupes$ED)
 Verify_Dupes$EXS = as.integer(Verify_Dupes$EXS)
 Verify_Dupes$EXE = as.integer(Verify_Dupes$EXE)
+
+# Add names to dataframe
+for (i in c(1:nrow(Verify_Dupes))) {
+  
+  Verify_Dupes$central_name[i] = Cut_CoinFinds$cf_name[Verify_Dupes$central_cf[i] == Cut_CoinFinds$ID]
+  Verify_Dupes$radius_name[i] = Cut_CoinFinds$cf_name[Verify_Dupes$radius_cf[i] == Cut_CoinFinds$ID]
+  
+}
+
+# Delete CHRE
+Verify_Dupes$delete = NA
+for (i in c(1:nrow(Verify_Dupes))) {
+
+  counter = 0
+  cent_true = grepl("CHRE-", Verify_Dupes$central_name[i], fixed=TRUE)
+  rad_true = grepl("CHRE-", Verify_Dupes$radius_name[i], fixed=TRUE)
+  
+  if (cent_true == TRUE) {
+    counter = 1
+    Verify_Dupes$delete[i] = counter} 
+  if (rad_true == TRUE) {
+    counter = 2
+    Verify_Dupes$delete[i] = counter
+  }
+  if (is.na(Verify_Dupes$delete[i])) {
+    Verify_Dupes$delete[i] = 0
+  }
+  }
+  
+Verify_Dupes = Verify_Dupes[Verify_Dupes$delete < 2,]
+
+
+# PAS
+Verify_Dupes$delete = NA
+for (i in c(1:nrow(Verify_Dupes))) {
+
+  counter = 0
+  cent_true = grepl("PAS:", Verify_Dupes$central_name[i], fixed=TRUE)
+  rad_true = grepl("PAS:", Verify_Dupes$radius_name[i], fixed=TRUE)
+  
+  if (cent_true == TRUE) {
+    counter = 1
+    Verify_Dupes$delete[i] = counter} 
+  if (rad_true == TRUE) {
+    counter = 2
+    Verify_Dupes$delete[i] = counter
+  }
+  if (is.na(Verify_Dupes$delete[i])) {
+    Verify_Dupes$delete[i] = 0
+  }
+  }
+  
+Verify_Dupes = Verify_Dupes[Verify_Dupes$delete < 2,]
+
+#user(PeterPhilips)
+Verify_Dupes$delete = NA
+philips_sub = Cut_CoinFinds$ID[Cut_CoinFinds$cf_user=="PeterPhilips"]
+for (i in c(1:nrow(Verify_Dupes))) {
+
+  counter = 0
+  cent_true = grepl("PAS:", Verify_Dupes$central_name[i], fixed=TRUE)
+  rad_true = grepl("PAS:", Verify_Dupes$radius_name[i], fixed=TRUE)
+  
+  if (Verify_Dupes$radius_cf[i] %in% philips_sub) {
+    counter = 1
+    Verify_Dupes$delete[i] = counter} 
+  if (Verify_Dupes$central_cf[i] %in% philips_sub) {
+    counter = 2
+    Verify_Dupes$delete[i] = counter
+  }
+  if (is.na(Verify_Dupes$delete[i])) {
+    Verify_Dupes$delete[i] = 0
+  }
+  }
+  
+Verify_Dupes = Verify_Dupes[Verify_Dupes$delete < 2,]
+
+Verify_Dupes = Verify_Dupes[1:(ncol(Verify_Dupes)-1)]
+
 ```
+
+******(Currently Commented Out) Disconsidered
+```{r}
+
+Verify_Dupes$disconsidered = NA
+for(i in c(1:nrow(old_VerDupes))) {
+  
+  if(!is.na(old_VerDupes$is.it.a.match[i])) {
+    
+    Verify_Dupes$disconsidered[i] = TRUE
+    
+  } else {
+    
+    Verify_Dupes$disconsidered[i] = FALSE
+    
+  }
+
+}
+
+Verify_Dupes = Verify_Dupes[Verify_Dupes$disconsidered == FALSE,]
+
+
+```
+
+Histogram matching
+```{r}
+Hist_CoinGroups = CoinGroups
+Hist_CoinGroups$date.range = NA
+Hist_CoinGroups$coins.per.25 = NA 
+for (i in c(1:nrow(Hist_CoinGroups))) {
+
+  st = toString(Hist_CoinGroups$cg_start_year[i])
+  st = paste(st, "-", toString(Hist_CoinGroups$cg_end_year[i]))
+  Hist_CoinGroups$date.range[i] = st
+  
+  Hist_CoinGroups$coins.per.25[i] = Hist_CoinGroups$cg_num_coins[i] / (Hist_CoinGroups$cg_end_year[i] - Hist_CoinGroups$cg_start_year[i]) 
+  }
+
+Verify_Dupes$distribution = NA
+for (i in c(1:nrow(Verify_Dupes))) {
+  Central = Hist_CoinGroups[CoinGroups$cfID == Verify_Dupes$central_cf[i],]
+  Radius = Hist_CoinGroups[CoinGroups$cfID == Verify_Dupes$radius_cf[i],]
+  
+  central_hist = data.frame(Central$date.range, Central$coins.per.25)
+  radius_hist = data.frame(Radius$date.range, Radius$coins.per.25)
+  
+  kstest = ks.test(Central$cg_num_coins, Radius$cg_num_coins, exact = FALSE)
+  if(kstest$p.value < .05) {
+    Verify_Dupes$distribution[i] = TRUE
+  } else {
+    Verify_Dupes$distribution[i] = FALSE
+  }
+  
+}
+
+
+
+# Central = Hist_CoinGroups[CoinGroups$cfID == 13307,]
+# Radius = Hist_CoinGroups[CoinGroups$cfID == 8497,]
+# central_hist = data.frame(Central$date.range, Central$coins.per.25)
+# radius_hist = data.frame(Radius$date.range, Radius$coins.per.25)
+# 
+barplot(Central$coins.per.25, names.arg=Central$date.range)
+barplot(Radius$coins.per.25, names.arg=Radius$date.range)
+# 
+# ks.test(Central$cg_num_coins, Radius$cg_num_coins)
+# ks.test(Central$date.range, Radius$date.range)
+```
+
 
 ```{r message=TRUE}
 #compute match scores
@@ -883,13 +1042,13 @@ Verify_Dupes$match.score = NA
 for (i in c(1:nrow(Verify_Dupes))) {
   
   if (!is.na(Verify_Dupes$EXS[i]) & !is.na(Verify_Dupes$EXE[i])) {
-  composites = composite(Verify_Dupes[i,3:9])
+  composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD", "ED", "EXS", "EXE")])
 } else if (!is.na(Verify_Dupes$EXS[i])) {
   composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD", "ED", "EXS")])
 } else if (!is.na(Verify_Dupes$EXE[i])) {
   composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD", "ED", "EXE")])
 } else {
-  composites = composite(Verify_Dupes[i,3:7])
+  composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD")])
 }
   
   Verify_Dupes$match.score[i] = composites
@@ -899,7 +1058,6 @@ Verify_Dupes$test = NA
 Verify_Dupes = Verify_Dupes[as.integer(Verify_Dupes$central_cf) != as.integer(Verify_Dupes$radius_cf),]
 #Removing Duplicates
 for (ex in c(1:nrow(Verify_Dupes))) {
-  print(ex)
   # if(as.integer(Verify_Dupes$central_cf[ex]) == as.integer(Verify_Dupes$radius_cf[ex])){
   #   Verify_Dupes = Verify_Dupes[-ex,]
   # }
@@ -914,10 +1072,16 @@ Verify_Dupes = Verify_Dupes[as.integer(Verify_Dupes$central_cf) != as.integer(Ve
   
 
 Verify_Dupes = Verify_Dupes[!duplicated(Verify_Dupes[,c('test')]),]
-#Verify_Dupes = data.frame(central_cf = Verify_Dupes$central_cf, radius_cf = Verify_Dupes$radius_cf, match.score = Verify_Dupes$match.score)
+Verify_Dupes = Verify_Dupes[,1:(ncol(Verify_Dupes)-1)]
+Verify_Dupes$yes.no = NA
 
-#Verify_Dupes$yes.no = NA
-
+names(Verify_Dupes)[names(Verify_Dupes) == "G"] <- "gold"
+names(Verify_Dupes)[names(Verify_Dupes) == "S"] <- "silver"
+names(Verify_Dupes)[names(Verify_Dupes) == "B"] <- "bronze"
+names(Verify_Dupes)[names(Verify_Dupes) == "SD"] <- "start date"
+names(Verify_Dupes)[names(Verify_Dupes) == "ED"] <- "end date"
+names(Verify_Dupes)[names(Verify_Dupes) == "EXS"] <- "excavation start"
+names(Verify_Dupes)[names(Verify_Dupes) == "EXE"] <- "excavation end"
 
 ```
 
@@ -945,7 +1109,8 @@ write_xlsx(Verify_Dupes,"/cloud/project/VerifyDuplicates.xlsx")
 
 List of Coin Finds that were cut
 ```{r}
-
+disconsidered
+old_VerDupes
 ```
 
 
