@@ -4,22 +4,18 @@ PURPOSE: This program was made to identify possible duplicate coin finds (CFs) i
 
 INPUT: This program takes as inputs dataframes of the CFs, coin groups (CGs), and a key that describes which coin denominations correspond to specific metals. These three data sets can be found in this repository. A user can also input a spread sheet of coin finds that are not duplicates, and the program will disregard them. 
 
-OUTPUT 1 (Cut_CoinFinds.xlsx): 
-
-OUTPUT 2 (PossibleDuplicates.xlsx): contains the geographical cluster that every coin find is attached to. 
-
-OUTPUT 3: The program will output a spread sheet of the cfIDs of possible duplicates (CF A and CF B) for someone to manually check. There will be a blank YES/NO column for someone to input whether the pair are duplicates are not. In the column "match score," each possible duplicate pair will be assigned a number that quantifies the degree to which the two matches. The spread sheet will be sorted by the match score so that highest matches scores are at the top.
+OUTPUT : The program will output a spread sheet of the cfIDs of possible duplicates (CF A and CF B) for someone to manually check. There will be a blank YES/NO column for someone to input whether the pair are duplicates are not. In the column "match score," each possible duplicate pair will be assigned a number that quantifies the degree to which the two matches. The spread sheet will be sorted by the match score so that highest matches scores are at the top.
 
 ## Detailed Description
 
-Now, I will walk through the program using some example coin finds. The code is seperated into chunks numbered sections. Below are the example coin finds:
-***The date ranges for coins in the coin find data frame sometimes have inconsistent dates. I will soon be correcting this by reconstructing the correct date from the coin group data frame. 
+Now, I will walk through the program using some example coin finds. The code is seperated into numbered sections that I will explain piece by piece. Below are the example coin finds:
+
 
 INPUT: 
 | cfID  |        name                                | x-coord  | y-coord  | excavation start | excavation end | start year | end year | num coins found | 
 | ----- | ------------------------------------------ | -------- | -------- | ---------------- | -------------- | ---------- | -------- | --------------- | 
 | 13293 | Le trésor byzantin de Nikerta              | 35.42224 | 36.40251 |     1968         |      1969      |    582     |     685  | 534             |
-| 9239  | Finds from Belgian excavation of Apamea    | 35.42224 | 36.40251 |       2005       |    2010        |     -300   |   750    | 87              |
+| 9239  | Finds from Belgian excavation of Apamea    | 35.42224 | 36.40251 |       2005       |    2010        |     325    |   688    | 87              |
 
 | cfID  | Total Gold | Total Silver | Total Bronze | Total Lead |
 | ----- | ---------- | ------------ | ------------ | ---------- |
@@ -28,50 +24,49 @@ INPUT:
 
 
 OUTPUT: 
-Cut_CoinFinds.csv
-| cfID  |        name                                | in.radius | y-coord  | excavation start | excavation end | start year | end year | num coins found |
-
-
-| ----- | ------------------------------------------ | -------- | -------- | ---------------- | -------------- | ---------- | -------- | --------------- | 
-| 13293 | Le trésor byzantin de Nikerta              | 35.42224 | 36.40251 |     1968         |      1969      |    582     |     685  | 534             |
-| 9239  | Finds from Belgian excavation of Apamea    | 35.42224 | 36.40251 |       2005       |    2010        |     -300   |   750    | 87              |
-
-| cfID  | Total Gold | Total Silver | Total Bronze | Total Lead |
-| ----- | ---------- | ------------ | ------------ | ---------- |
-| 13293 | 533        |              |   1          |            |
-| 9239  |            |              |   87         |            |
-
-PossibleDuplicates.xlsx
-| cfID  |        name                                | x-coord  | y-coord  | excavation start | excavation end | start year | end year | num coins found | 
-| ----- | ------------------------------------------ | -------- | -------- | ---------------- | -------------- | ---------- | -------- | --------------- | 
-| 13293 | Le trésor byzantin de Nikerta              | 35.42224 | 36.40251 |     1968         |      1969      |    582     |     685  | 534             |
-| 9239  | Finds from Belgian excavation of Apamea    | 35.42224 | 36.40251 |       2005       |    2010        |     -300   |   750    | 87              |
-
-| cfID  | Total Gold | Total Silver | Total Bronze | Total Lead |
-| ----- | ---------- | ------------ | ------------ | ---------- |
-| 13293 | 533        |              |   1          |            |
-| 9239  |            |              |   87         |            |
 
 VerifyDuplicates.xlsx
-match score | cf ID A | cf ID B | YES/NO | NOTES
+| central_cf | central_name           | radius_cf |   radius_name    | G | S | B | SD | ED | EXS | EXE | match.score | is.it.a.match |
+| ---------- | ---------------------- | --------  | ---------------- | - | - | - | -- | -- | --- | --- | ----------- | ------------- |
+|   13293    | Le trésor byzantin..   |  9239     | Belgian excav... | 0 | 1 | 0 | 0  | 1  |  0  |  0  | ----------- |    1 or 0     |
 
+G = Gold
+S = Silver 
+B = Bronze
+SD = Start Date (date range on coins)
+ED = End Date (date range on coins)
+EXS = Excavation Start Date
+EXE = Excavation End Date
 
+### (1 and 2) Packages and Loading Data
+The most important package loaded is "sf," as it does the location matching portion of the program. 
 
-### (ONE) Replacing NAs and Striking Coin Finds
+The second section takes the program's inputs. CoinFinds and CoinGroups are the product of downloading all coin data from the Circulation Application with no filters. Coin_Info is a key that defines which denominations correspond to each metal.
+
+Currently commented out right now is the option to input an old version of VerifyDuplicates with is.it.a.match filled out. This file will allow the program to take out all pairs that have already been checked in subsequent runs.
+
+### (3 and 4) Formatting Coin Denomination/Metals 
+In these sections, I reformat the coin denomination and metal information from Coin_Info and use it to create a new column in CoinGroups with the metal of each coin group. 
+
+### (5) Replacing NAs and Striking Coin Finds
 There are a few coin finds that have NAs listed for the number of coins found. To rememdy this, I totaled the coin amounts inputted in the coin group data frame (df) and replaced the NAs with this total. 
 
 Coin finds that meet the following criteria are struck from the data set: 
 - If any cf_num_coins_found==NA or 0 after an attempt is made to reconstruct this number with Coin Group df info. 
 - Any coin finds with THS in their name, as they follow a data entry convention incompatible with this program.
 
-Coin groups that meet the following criteria are struck from the data set: 
+Coin groups that meet the following criteria are struck from the data set. When coin groups are struck, some coin finds no longer have coin groups listed in the system. These are struck as well, which amounts to 60:
 - cg_num_coins_found==NA or 0 
 - Coin Groups where metal == NA
 
 Therefore, the CF dataframe starts with ~5,200 coin finds and is reduced to ~3,800 through the above cuts.
 
+### (6) Reconstructing Metrics in CoinFinds from CoinGroups
+Here, I create columns in CoinFinds that break up the total amount of coins in a cf by metal, using the information from the CoinGroups df. 
 
-### (TWO) Location Filter (This block takes the longest to run)
+Then I total up the amount of coins for each metal and replace the number of coins found listed in CoinFinds with this value. This remedies an error in the CoinFinds data, where an incorrect total coin amount was listed that didn't match the CoinGroups data.
+
+### (7) Location Filter 
 Coin finds are grouped into geographical clusters that set which CFs get compared to each other throughout the program. 
 
 First, the user sets a radius for the geographical size of the cluster desired. This is currently set to 1 km. Using the latitude and longitude coordinates assigned to every coin find, the program uses the sf package to create spatial objects for each coin find. 
@@ -83,6 +78,20 @@ This step will idenitfy the CF, 9239, as being within a 1 km radius of 13293. An
 For every central CF, a list of CFs (including itself) are stored in the coin finds data frame (Cut_CoinFinds) in the column "in.radius"
 For our example, this will look like c(13293, 9239).
 
+### (9) Disconsider Finds not in a Cluster
+In this section, I remove all coin finds that do not fall into a geographical cluster from consideration of being a duplicate. I save this smaller group in a new df called Dupe_CoinFinds It has 1,186 entries. 
+
+### (10) Create Verify_Dupes
+Then I start to construct the output df. I break down the coin find clusters into pairs, and each pair forms a row in the Verify_Dupes df. I create a column for each metric that I will be comparing between the two finds (Gold, Silver, Bronze, Start Date, End Date, Excavation Start Date, Excavation End Date). These columns will be filled with a 1 or 0, indicating whether the metrics match (within a tolerance) or not.
+
+With our example, the program would create the entry listed at the beginning of this file under output. 
+
+### (11) Delete Redundant Pairs/Those Not to be Considered
+Coin finds that are both within a database that FLAME imported are likely not duplicates. Therefore, if coins within a pair both were labeled with CHRE or PAS or they were entered by the user "PeterPhilips," that pair is struck.
+
+Section 10 created rows with some cf pairs having the same cf (ex. A and A), which I strike in this section. Some pairs are also permutations of each other (ex. A and B ; B and A), so I remove one of these permutations.
+
+In all, there are 1,459 coin find pairs.
 
 ### (THREE) Quantity Filter
 The amount of coins for each find is compared between members of a geographical cluster. 
