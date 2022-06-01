@@ -93,6 +93,9 @@ Section 10 created rows with some cf pairs having the same cf (ex. A and A), whi
 
 In all, there are 1,459 coin find pairs.
 
+### (12) Removing Coin Find Pairs Already Addressed
+
+
 ### (THREE) Quantity Filter
 The amount of coins for each find is compared between members of a geographical cluster. 
 
