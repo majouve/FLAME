@@ -26,9 +26,9 @@ INPUT:
 OUTPUT: 
 
 VerifyDuplicates.xlsx
-| central_cf | central_name           | radius_cf |   radius_name    | G | S | B | SD | ED | EXS | EXE | match.score | is.it.a.match |
-| ---------- | ---------------------- | --------  | ---------------- | - | - | - | -- | -- | --- | --- | ----------- | ------------- |
-|   13293    | Le trésor byzantin..   |  9239     | Belgian excav... | 0 | 1 | 0 | 0  | 1  |  0  |  0  | ----------- |    1 or 0     |
+| central_cf | central_name           | radius_cf |   radius_name    | G | S | B | SD | ED | EXS | EXE | sequent | single | match.score | is.it.a.match |
+| ---------- | ---------------------- | --------  | ---------------- | - | - | - | -- | -- | --- | --- | ------- | ------ | ----------- | ------------- |
+|   13293    | Le trésor byzantin..   |  9239     | Belgian excav... | 0 | 1 | 0 | 0  | 1  |  0  |  0  |     0   |  XXX   |  ---------- |    1 or 0     |
 
 G = Gold
 S = Silver 
@@ -78,7 +78,7 @@ This step will idenitfy the CF, 9239, as being within a 1 km radius of 13293. An
 For every central CF, a list of CFs (including itself) are stored in the coin finds data frame (Cut_CoinFinds) in the column "in.radius"
 For our example, this will look like c(13293, 9239).
 
-### (9) Disconsider Finds not in a Cluster
+### (9) Remove Finds not in a Cluster
 In this section, I remove all coin finds that do not fall into a geographical cluster from consideration of being a duplicate. I save this smaller group in a new df called Dupe_CoinFinds It has 1,186 entries. 
 
 ### (10) Create Verify_Dupes
@@ -94,6 +94,30 @@ Section 10 created rows with some cf pairs having the same cf (ex. A and A), whi
 In all, there are 1,459 coin find pairs.
 
 ### (12) Removing Coin Find Pairs Already Addressed
+
+### (13) Histogram Matching
+In this 
+
+
+### (14) Filters Part I
+In this section, specific metrics of the coin find pairs are compared. Currently, there are two different version of this section. 
+
+The other version calculates the percent difference between the central and radius metrics. It also does not use excavation start and end dates because these metrics have more missingness. 
+
+VERSION 1:
+
+VERSION 2: 
+
+### (15) Filters Part II
+
+Are the cfIDs sequential?
+
+
+Where does the total amount of coins in the coin find pair fall in comparison to the other pairs?
+
+
+
+### (16) Computing Composites
 
 
 ### (THREE) Quantity Filter
@@ -188,42 +212,4 @@ Then, it also produces to difference lists:
 NOTE: Alternative outputs are:
 NA: This occurs when the central coin find has NA for the start year or the end year
 NA as the component of a list (ex. c(0, 97, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
-
-
-### (SEVEN) Cut out Finds with Nothing in the Radius
-In the Cut_CoinFinds dataframe (main dataframe where all the columns have been added), there are many coin finds with nothing in their radius. 
-I subset these from the data set, saving the smaller data set of coins with possible duplicates into TEST_CoinFinds. This has ~2,000 cfs. 
-
-The coin finds that have no geographical matches are also saved into a dataframe. This dataframe can be inputted into the program so that these coin finds are disconsidered when the program is run in the future.
-
-
-### (EIGHT) Create Cluster IDs
-Then I created a cluster ID for each geographical cluster. It is composed of the cfIDs in the cluster seperated by ".". For our example, the cluster ID would be 13293.9239
-
-
-### (NINE & TEN & ELEVEN) Create Cluster Comparison Data Frame (FULL_clusters)
-Now, I created a new data frame (FULL_clusters) with new metrics to help make comparisons between the clusters better. I include the following information in this data frame:
-
-- cfID, name (long name assigned to find), author (person who inputted the find)
-- cluster ID
-- radius = the radius the geographical cluster is in (set to 1 for all)
-
-After this indentifying material, I cycle through the same three types of columns for each metric:
-- total.gold / silver / bronze / lead
-- start/end.year
-- excav.start/end.year
-
-I have columns for three metric:
-- I list the value itself (ex. total.gold, excavation start year)
-
-- avg.X.dif = sum(central find - each radius find)
-ex. avg.bronze.dif = (0-86)/(2-1) =  -86
-NOTE = the bronze difference list is c(0, -86). By subtracting one from the denominator, we don't consider the 0 from 13293 being subtracted from itself.
-
-- percent.X.same = percent of the values in the TRUE/FALSE list that are TRUE (excluding the value that is true because the central coin find is compared to itself)
-ex. For avg.bronze.dif of 13293 = (1/(2-1)) = 0% 
-NOTE = the bronze TRUE/FALSE list is c(TRUE,FALSE). By subtracting one from the denominator, we don't consider the TRUE from 13293 being compared to itself.
-
-### (TWELVE) Match Score
-Then I create the match score to help us prioritize which coin clusters to compare for duplicates first. The match score will use the metrics calculated in the FULL_clusters data frame. In the final output data frame, the match score will be used to sort coin finds that are the most likely to be duplicates to the top.
 
