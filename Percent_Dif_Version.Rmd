@@ -1,0 +1,763 @@
+---
+title: "Percent_Dif_Version"
+output: html_document
+date: '2022-06-05'
+---
+(1)
+```{r}
+library(dplyr)
+library(ggplot2)
+library(janitor)
+library(tidyr)
+library(tidyverse)
+library(sf)
+library(readxl)
+library(writexl)
+library(multicon)
+library(ks)
+library(xtable)
+library(naniar)
+```
+
+PROCESSING
+(2) Read in Data (Download Date: )
+```{r}
+CoinFinds = read.csv("CoinFinds.csv")
+ORIGINAL_cf = CoinFinds
+CoinGroups = read.csv("CoinGroups.csv")
+ORIGINAL_cg = CoinGroups
+Coin_Info = read_excel("Coin_info.xlsx", sheet="Denominations")
+
+# # Disconsidered Coin Find excel sheet labeled Not_A_Duplicate.xlsx
+# old_VerDupes = read_excel("VerifyDuplicates.xlsx")
+
+```
+
+(3) Coin_Info has the information about which metal corresponds to each denomination. 
+Here, I am formatting it so I can use it in the next section. 
+```{r}
+Coin_Info$Metal = str_extract(Coin_Info$Name,"(\\w+)")
+Coin_Info$Name = gsub("(Gold)","",as.character(Coin_Info$Name))
+Coin_Info$Name = gsub("(Silver)","",as.character(Coin_Info$Name))
+Coin_Info$Name = gsub("(Bronze)","",as.character(Coin_Info$Name))
+Coin_Info$Name = gsub("(Lead)","",as.character(Coin_Info$Name))
+Coin_Info$Name = substring(Coin_Info$Name, 4)
+```
+
+(4) Creating a metal column in the CoinGroups dataframe using the information from Coin_Info
+```{r}
+
+CoinGroups$metal = NA
+for (n in c(1:nrow(CoinGroups))) {
+  
+  #finding the index of the denomination in Coin_Info that corresponds with the Coin Group
+  denom_list = c(Coin_Info[['Name']])
+  denom_index = match(CoinGroups$DenominationName[n], denom_list, nomatch = 0)
+  
+  # inputting the metal that corresponds with the denomination of each coin group
+  # skipping if the Coin Group does not have a metal listed
+  if(denom_index == 0) {
+    next
+    
+  } else {
+    metal = Coin_Info$Metal[denom_index]
+    CoinGroups$metal[n] = metal
+  }
+  
+}
+```
+
+(5) 
+Filling in NAs in cf_num_coins_found with amounts in CoinGroups dataframe.
+A few categories of coin groups and coin finds get struck:
+- If cf_num_coins_found==NA or 0 after this reformatting
+-everything with THS in the name
+
+- Coin Groups where metal == NA
+- cg_num_coins_found==NA or 0 still after this reformatting
+    *NOTE = When coin groups are struck, some coin finds no longer have coin groups listed in the system. These are struck as well, which amounts to 60.
+```{r}
+
+for( i in c(1:nrow(CoinFinds))) {
+   if(is.na(CoinFinds$cf_num_coins_found[i])) {
+     
+    # summing up coin amounts from each coin group in the coin find 
+    CGs = CoinGroups[CoinGroups$cfID==CoinFinds$ID[i],]
+    Sum = sum(CGs$cg_num_coins)
+    CoinFinds$cf_num_coins_found[i] = Sum
+   }
+  
+  #striking coin finds that still have NA for cf_num_coins_found
+   if(is.na(CoinFinds$cf_num_coins_found[i])){
+     CoinFinds[-i,]
+   }
+  
+}
+
+# taking out rows where cf_num_coins_found is equal to 0 and cg_num_coins_found is 0
+CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found != 0 & !is.na(CoinFinds$cf_num_coins_found),]
+
+# taking out rows where cg_num_coins_found is equal to 0 and cg_num_coins_found
+CoinGroups = CoinGroups[CoinGroups$cg_num_coins != 0 & !is.na(CoinGroups$cg_num_coins),]
+
+# taking out coin groups where metal == NA
+CoinGroups = CoinGroups %>% drop_na(metal)
+
+#taking out everything with THS
+CoinFinds = CoinFinds[!grepl("THS-", CoinFinds$cf_name),]
+CoinGroups = CoinGroups[!grepl("THS-", CoinGroups$cf_name),]
+```
+
+(6) I create columns in CoinFinds that break up the coin amounts by metal. I also reconstruct the date ranges based on info from the CoinGroup data frame to replace the incorrect information in the CoinFinds data frame.
+```{r}
+
+# Reconstruct the total number of coins by summing up the silver, gold, bronze, and lead across a coin find's coin groups
+# Reconstruct start and end dates from the lowest and highest respectively of dates listed among a cf's cgs. 
+CoinFinds$total.gold = NA
+CoinFinds$total.silver = NA
+CoinFinds$total.bronze = NA
+CoinFinds$total.lead = NA
+for (z in c(1:nrow(CoinFinds))) {
+  index = z
+  
+  # get the cgIDs corresponding to central cf
+  point_ID = CoinFinds$ID[index]
+  point_CGs = CoinGroups[CoinGroups$cfID==point_ID,]
+  
+  #sum up amount of coins of each metal for a coin find
+  point_silver = sum(point_CGs$cg_num_coins[point_CGs$metal=="Silver"])
+  point_gold = sum(point_CGs$cg_num_coins[point_CGs$metal=="Gold"])
+  point_bronze = sum(point_CGs$cg_num_coins[point_CGs$metal=="Bronze"])
+  point_lead = sum(point_CGs$cg_num_coins[point_CGs$metal=="Lead"])
+ 
+  CoinFinds$total.gold[index] = point_gold
+  CoinFinds$total.silver[index] = point_silver
+  CoinFinds$total.bronze[index] = point_bronze
+  CoinFinds$total.lead[index] = point_lead
+  CoinFinds$cf_num_coins_found[index] = point_gold + point_silver + point_bronze + point_lead 
+  
+  #This will throw up an error about infinity, but I'm cutting out those coin finds in a few lines
+  best_start_date = min(point_CGs$cg_start_year)
+  best_end_date = max(point_CGs$cg_end_year)
+  
+  CoinFinds$cf_start_year[index] = best_start_date
+  CoinFinds$cf_end_year[index] = best_end_date }
+
+#Taking out coin finds that no longer have coin groups associated with them
+CoinFinds = CoinFinds[CoinFinds$cf_num_coins_found!=0,]
+
+```
+
+DUPLICATE MATCHING
+(7) Location Filter: For each coin find location, return all coin finds within a certain radius (that you input) in a list, forming a column of CoinFinds
+```{r}
+#####INPUT RADIUS IN KM####
+RADIUS = 5
+##############
+
+CoinFinds$in.radius = NA
+CoinFinds$num.in.radius = NA
+
+# Using the sf package, creating spatial objects out of each coin find's lat and long points
+longitude_list = CoinFinds$cf_custom_y_coordinate
+latitude_list = CoinFinds$cf_custom_x_coordinate
+IDs_list = CoinFinds$ID
+target <- data_frame(ID = IDs_list, longitude = longitude_list, latitude = latitude_list)
+target_sf <- st_as_sf(target, coords = c("longitude", "latitude"))
+st_crs(target_sf) <- 4326
+
+for (i in c(1:nrow(CoinFinds))) {
+  index = i
+
+  # creating sf spatial object out of the central point in radius
+  point_ID = CoinFinds$ID[index]
+  point <- data_frame(ID = point_ID, mylon = CoinFinds$cf_custom_y_coordinate[index], mylat = CoinFinds$cf_custom_x_coordinate[index]) 
+  point_sf <- st_as_sf(point, coords = c("mylon", "mylat"))
+  st_crs(point_sf) <- 4326
+  
+  #  filter records within the RADIUS specified
+  target_sf2 <- target_sf %>%
+    #compare between the point and target to see if they are a duplicate?
+    mutate(Dist = as.numeric(st_distance(point_sf, target_sf, by_element = TRUE))) %>%
+    filter(Dist <= RADIUS)
+  
+  #adding IDs of coin finds in radius to CoinFinds data frame
+  test.target = target_sf2 %>% as_tibble()
+  rad.IDs = list(test.target$ID)
+  CoinFinds$in.radius[index] = I(rad.IDs)
+  CoinFinds$num.in.radius[index] = length(test.target$ID)
+}
+
+
+# Originally, I was going to take coin finds out that had no other finds in their radius but I decided not to. 
+# But I already ended up using Cut_CoinFinds as a variable name below, so I just keep it here. 
+Cut_CoinFinds = CoinFinds
+
+```
+
+(9) Cut out finds with no other finds in their radius. 
+```{r}
+# create new dataframe of possible duplicates to test
+Dupe_CoinFinds = CoinFinds
+
+# creating a column that flags whether a central cf has only one cf in its radius
+# (The location filter will place a point within its own radius, so if a cf has only one other cf in its radius, they are the same)
+Dupe_CoinFinds$one.in.radius = NA
+for (i in c(1:nrow(Dupe_CoinFinds))) {
+  
+  length = length(Dupe_CoinFinds$in.radius[i][[1]])
+  if (length==1) {
+    Dupe_CoinFinds$one.in.radius[i] = TRUE
+  }else{
+    Dupe_CoinFinds$one.in.radius[i] = FALSE
+  }
+}
+
+# this is the data frame of CFs that can't be duplicates
+disconsidered_CFs = Dupe_CoinFinds[Dupe_CoinFinds$one.in.radius==TRUE,]
+
+# this is the data fram of coin finds that could be duplicates
+Dupe_CoinFinds = Dupe_CoinFinds[Dupe_CoinFinds$one.in.radius==FALSE,]
+
+```
+
+(10) Create a new data frame (Verify_Dupes) that unwraps the clusters into pairs that will be compared to each other
+```{r}
+
+# create new data frame
+Verify_Dupes = data.frame(
+  central_cf = NA,
+  central_name = NA,
+  central_bib = NA,
+  central_auth = NA,
+  
+  radius_cf = NA,
+  radius_name = NA,
+  radius_bib = NA,
+  radius_auth = NA,
+  
+  # provisional
+  central_count = NA,
+  radius_count = NA
+)
+
+# iterate through Dupe_CoinFinds to create pairs out of the clusters
+# fill in the central coin find column and create spaces in Verify_Dupes that will be filled in the next for loop
+verID = 1
+for (i in c(1:nrow(Dupe_CoinFinds))) {
+  full = i
+  Verify_Dupes$central_cf[verID] = Dupe_CoinFinds$ID[full]
+  cluster.list = Dupe_CoinFinds$in.radius[full]
+  rows = length(cluster.list[[1]])
+  
+  new = data.frame(central_cf = rep(NA, rows), 
+                   central_name = rep(NA, rows), 
+                   central_bib = rep(NA, rows), 
+                   central_auth = rep(NA, rows),
+                   
+                   radius_cf = rep(NA, rows), 
+                   radius_name = rep(NA, rows),
+                   radius_bib = rep(NA, rows), 
+                   radius_auth = rep(NA, rows),
+                   
+                   # provisional
+                   central_count = rep(NA, rows),
+                   radius_count = rep(NA, rows)
+                   
+                   )
+  
+  Verify_Dupes = rbind(Verify_Dupes, new)
+
+  verID = verID + rows
+  
+}
+
+#back fill empty cells with rest of central coin finds and radius finds
+verID = 1
+for (i in c(1:nrow(Dupe_CoinFinds))) {
+  full = i
+  
+  cluster.list = Dupe_CoinFinds$in.radius[full]
+  rows = length(cluster.list[[1]])
+  
+  key = Verify_Dupes$central_cf[verID]
+  Verify_Dupes$radius_cf[verID] = cluster.list[[1]][1]
+  
+  for(cent in c(1:rows)){
+    Verify_Dupes$central_cf[(cent+verID)-1] = key
+    if (cent>1){ 
+      Verify_Dupes$radius_cf[(cent+verID)-1] = cluster.list[[1]][cent]
+     }
+  }
+  verID = verID + rows
+}
+Verify_Dupes = Verify_Dupes[1:(nrow(Verify_Dupes)-1),]
+
+# Add coin find names to dataframe
+for (i in c(1:nrow(Verify_Dupes))) {
+  
+  Verify_Dupes$central_name[i] = Dupe_CoinFinds$cf_name[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
+  Verify_Dupes$radius_name[i] = Dupe_CoinFinds$cf_name[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
+  
+  Verify_Dupes$central_bib[i] = Dupe_CoinFinds$cf_publication_ref[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
+  Verify_Dupes$radius_bib[i] = Dupe_CoinFinds$cf_name[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
+  
+  Verify_Dupes$central_auth[i] = Dupe_CoinFinds$cf_user[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
+  Verify_Dupes$radius_auth[i] = Dupe_CoinFinds$cf_user[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
+  
+  # provisional
+  Verify_Dupes$central_count[i] = Dupe_CoinFinds$cf_num_coins_found[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
+  Verify_Dupes$radius_count[i] = Dupe_CoinFinds$cf_num_coins_found[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
+}
+
+```
+
+(11) Deleting from the data frame
+- coin pairs both labeled CHRE, PAS, entered by PeterPhilips
+- remove pairs that are the same (ex. A, A or B, B)
+- remove pairs that are permutations (ex. If A, B exists, I would remove B, A)
+```{r}
+# Delete coin find pairs that are both labeled with CHRE
+Verify_Dupes$delete = NA
+for (i in c(1:nrow(Verify_Dupes))) {
+
+  counter = 0
+  cent_true = grepl("CHRE-", Verify_Dupes$central_name[i], fixed=TRUE)
+  rad_true = grepl("CHRE-", Verify_Dupes$radius_name[i], fixed=TRUE)
+  
+  if (cent_true == TRUE) {
+    counter = 1
+    Verify_Dupes$delete[i] = counter} 
+  if (rad_true == TRUE) {
+    counter = 2
+    Verify_Dupes$delete[i] = counter
+  }
+  if (is.na(Verify_Dupes$delete[i])) {
+    Verify_Dupes$delete[i] = 0
+  }
+  }
+Verify_Dupes = Verify_Dupes[Verify_Dupes$delete < 2,]
+
+
+# Delete coin find pairs that are both labeled with PAS
+Verify_Dupes$delete = NA
+for (i in c(1:nrow(Verify_Dupes))) {
+
+  counter = 0
+  cent_true = grepl("PAS:", Verify_Dupes$central_name[i], fixed=TRUE)
+  rad_true = grepl("PAS:", Verify_Dupes$radius_name[i], fixed=TRUE)
+  
+  if (cent_true == TRUE) {
+    counter = 1
+    Verify_Dupes$delete[i] = counter} 
+  if (rad_true == TRUE) {
+    counter = 2
+    Verify_Dupes$delete[i] = counter
+  }
+  if (is.na(Verify_Dupes$delete[i])) {
+    Verify_Dupes$delete[i] = 0
+  }
+  }
+Verify_Dupes = Verify_Dupes[Verify_Dupes$delete < 2,]
+
+# Delete coin find pairs that were both entered by PeterPhilips
+Verify_Dupes$delete = NA
+philips_sub = Cut_CoinFinds$ID[Cut_CoinFinds$cf_user=="PeterPhilips"]
+for (i in c(1:nrow(Verify_Dupes))) {
+
+  counter = 0
+  
+  if (Verify_Dupes$radius_cf[i] %in% philips_sub) {
+    counter = 1
+    Verify_Dupes$delete[i] = counter} 
+  if (Verify_Dupes$central_cf[i] %in% philips_sub) {
+    counter = 2
+    Verify_Dupes$delete[i] = counter
+  }
+  if (is.na(Verify_Dupes$delete[i])) {
+    Verify_Dupes$delete[i] = 0
+  }
+  }
+Verify_Dupes = Verify_Dupes[Verify_Dupes$delete < 2,]
+Verify_Dupes = Verify_Dupes[1:(ncol(Verify_Dupes)-1)]
+
+
+# Remove pairs if they are the same coin find
+Verify_Dupes$test = NA
+Verify_Dupes = Verify_Dupes[as.integer(Verify_Dupes$central_cf) != as.integer(Verify_Dupes$radius_cf),]
+
+# Remove duplicates that are just rearranged (ex. if A, B exists, I would remove B, A)
+for (ex in c(1:nrow(Verify_Dupes))) {
+  perm.test = c(as.integer(Verify_Dupes$central_cf[ex]), as.integer(Verify_Dupes$radius_cf[ex]))
+  perm.test = sort(perm.test)
+  perm.test = toString(perm.test)
+  Verify_Dupes$test[ex] = perm.test
+}
+
+Verify_Dupes = Verify_Dupes[as.integer(Verify_Dupes$central_cf) != as.integer(Verify_Dupes$radius_cf),]
+Verify_Dupes = Verify_Dupes[!duplicated(Verify_Dupes[,c('test')]),]
+Verify_Dupes = Verify_Dupes[,1:(ncol(Verify_Dupes)-1)]
+
+```
+
+####Commented Out/Still working
+(12) (Currently Commented Out) Disconsidered
+- this modules will delete pairs from Verify_Dupes if is.it.a.match has already been filled in. This indicates that the find pair has already been addressed. 
+```{r}
+Verify_Dupes$is.it.a.match = NA
+# Verify_Dupes$disconsidered = NA
+# for(i in c(1:nrow(old_VerDupes))) {
+#   
+#   if(!is.na(old_VerDupes$is.it.a.match[i])) {
+#     
+#     Verify_Dupes$disconsidered[i] = TRUE
+#     
+#   } else {
+#     
+#     Verify_Dupes$disconsidered[i] = FALSE
+#     
+#   }
+# 
+# }
+# 
+# Verify_Dupes = Verify_Dupes[Verify_Dupes$disconsidered == FALSE,]
+
+
+```
+
+(13) Histogram matching
+Do I try this without zeros?
+```{r}
+Verify_Dupes$distribution = NA
+
+# 1st for loop that goes through verify_dupes
+# It creates two new data frames in for loop and populates them with 325-750)
+# Then it uses the coin groups to fill in for each cell proper values. 
+  # It would take (coin amount / ((start - end)+1) and then that ammount in each
+# then K-S test with p vals. no need to worry about x bc it's constant. 
+
+# create data frame for the histogram with years
+Histogram = data.frame(year = rep(NA, (426+8+41)), coins.per.year.cent = rep(NA, (426+8+41)), coins.per.year.rad = rep(NA, (426+8+41)))
+
+for (i in c(1:nrow(Histogram))) {
+  Histogram$year[i] = (i-1) + 325
+}
+ Histogram[is.na(Histogram)] = 0
+
+# put the coins.per.year values from CoinGroups into Histogram
+for (f in c(1:nrow(Verify_Dupes))) {
+  Central = Hist_CoinGroups[CoinGroups$cfID == Verify_Dupes$central_cf[f],]
+  Radius = Hist_CoinGroups[CoinGroups$cfID == Verify_Dupes$radius_cf[f],]
+  
+  # central
+    for (l in c(1:nrow(Central))) {
+      cent.index = (Central$cg_start_year[l]-325)+1
+      date.range = (Central$cg_end_year[l] - Central$cg_start_year[l])+1
+      coins.per.year = Central$cg_num_coins[l] / date.range
+      Histogram$coins.per.year.cent[cent.index] = Histogram$coins.per.year.cent[cent.index] + coins.per.year
+      
+      for (a in c(1:(date.range-1))) {
+        Histogram$coins.per.year.cent[cent.index+a] = Histogram$coins.per.year.cent[cent.index+a] + coins.per.year
+      } }
+  
+  # radius
+  for (m in c(1:nrow(Radius))) {
+    rad.index = (Radius$cg_start_year[m]-325) 
+    date.range = (Radius$cg_end_year[m] - Radius$cg_start_year[m])+1
+    coins.per.year = Radius$cg_num_coins[m] / date.range
+    Histogram$coins.per.year.rad[rad.index] = Histogram$coins.per.year.rad[rad.index] + coins.per.year 
+    
+    for (e in c(1:(date.range-1))) {
+        Histogram$coins.per.year.rad[rad.index+e] = Histogram$coins.per.year.rad[rad.index+e] + coins.per.year 
+      }  }
+  
+  # Histogram = Histogram[Histogram$coins.per.year.cent>0,]
+  # Histogram = Histogram[Histogram$coins.per.year.rad>0,]
+  # If value is TRUE (p < .05), the two histograms are DIFFERENT
+  # If the value is FALSE (p >= .05), the two histograms are the SAME
+    kstest = ks.test(Histogram$coins.per.year.cent, Histogram$coins.per.year.rad, exact = FALSE)
+  if(kstest$p.value < .05) {
+    Verify_Dupes$distribution[f] = 1
+  } else {
+    Verify_Dupes$distribution[f] = 0
+  }
+  
+  Histogram = replace_with_na_all(Histogram, ~.x>=0)
+  Histogram[is.na(Histogram)] = 0
+}
+
+```
+######END
+
+(14) Filters
+This module fills in the six metrics in Verify_Dupes by comparing between pairs. You can fill in the desired tolerances for the comparisons. 
+```{r}
+#EXCAVATION START AND END (ORIGINAL: 2)
+####INPUT####
+# START_RANGE = 2
+# END_RANGE = 2
+#############
+
+#DATE RANGE START AND END YEAR (ORIGINALL: 25)
+####INPUT####
+EARLY_DATE = 25
+LATE_DATE = 25
+#############
+
+# create columns for the metrics to match the coin finds
+Verify_Dupes$G = NA
+Verify_Dupes$S = NA
+Verify_Dupes$B = NA
+Verify_Dupes$SD = NA
+Verify_Dupes$ED = NA
+# Verify_Dupes$EXS = NA
+# Verify_Dupes$EXE = NA
+Verify_Dupes$sequential = NA
+Verify_Dupes$singleton = NA
+
+for (z in c(1:nrow(Verify_Dupes))) {
+  
+  index = z
+  
+  # central coin find
+  point_ID = Verify_Dupes$central_cf[index]
+  central_cf_info = Dupe_CoinFinds[Dupe_CoinFinds$ID==Verify_Dupes$central_cf[index],]
+  point_CGs = CoinGroups[CoinGroups$cfID==point_ID,]
+  
+  point_num_silver = length(point_CGs$cg_num_coins[point_CGs$metal=="Silver"])
+  point_num_gold = length(point_CGs$cg_num_coins[point_CGs$metal=="Gold"])
+  point_num_bronze = length(point_CGs$cg_num_coins[point_CGs$metal=="Bronze"])
+  
+  point_silver = central_cf_info$total.silver
+  point_gold = central_cf_info$total.gold
+  point_bronze = central_cf_info$total.bronze
+  
+  # radius coin find
+  radius_ID = Verify_Dupes$radius_cf[index]
+  radius_cf_info = Dupe_CoinFinds[Dupe_CoinFinds$ID==Verify_Dupes$radius_cf[index],]
+  rad_CGs = CoinGroups[CoinGroups$cfID==radius_ID,]
+  
+  rad_silver = radius_cf_info$total.silver
+  rad_gold = radius_cf_info$total.gold
+  rad_bronze = radius_cf_info$total.bronze
+  
+  
+  #### METALS ####
+  # if((rad_gold <= (point_gold + point_num_gold) & 
+  #       rad_gold >= (point_gold - point_num_gold))) {
+  #     Verify_Dupes$G[index] = 1
+  #     
+  #   } else {
+  #     Verify_Dupes$G[index] = 0 }
+  #   
+  #   # silver 
+  #   if((rad_silver <= (point_silver + point_num_silver) & 
+  #       rad_silver >= (point_silver - point_num_silver))) {
+  #     Verify_Dupes$S[index] = 1
+  #     
+  #   } else {
+  #     Verify_Dupes$S[index] = 0}
+  #   
+  #   # bronze 
+  #   if((rad_bronze <= (point_bronze + point_num_bronze) & 
+  #       rad_bronze >= (point_bronze - point_num_bronze))) {
+  #     Verify_Dupes$B[index] = 1
+  #   } else {
+  #     Verify_Dupes$B[index] = 0  }
+  
+  if (rad_gold == 0 & point_gold == 0) {
+    Verify_Dupes$G[index] = 0
+  } else if (rad_gold == 0 & point_gold != 0) {
+    Verify_Dupes$G[index] = abs((rad_gold - point_gold)/point_gold)
+  }else{
+    Verify_Dupes$G[index] = abs((point_gold - rad_gold)/rad_gold)
+  }
+  
+  if (rad_silver == 0 & point_silver == 0) {
+    Verify_Dupes$S[index] = 0
+  } else if (rad_silver == 0 & point_silver != 0) {
+    Verify_Dupes$S[index] = abs((rad_silver - point_silver)/point_silver)
+  } else {
+    Verify_Dupes$S[index] = abs((point_silver - rad_silver)/rad_silver)
+  }
+  
+  if (rad_bronze == 0 & point_bronze == 0) {
+    Verify_Dupes$B[index] = 0
+  } else if (rad_bronze == 0 & point_bronze != 0) {
+    Verify_Dupes$B[index] = abs((rad_bronze - point_bronze)/point_bronze)
+  }else {
+    Verify_Dupes$B[index] = abs((point_bronze - rad_bronze)/rad_bronze)
+  }
+  
+  # #### EXCAVATION YEAR ####
+  #   radius_start = radius_cf_info$cf_excavation_start
+  #   radius_end = radius_cf_info$cf_excavation_end
+  #   central_start = central_cf_info$cf_excavation_start
+  #   central_end = central_cf_info$cf_excavation_end
+  # 
+  #   # start year
+  #    if (is.na(radius_start) | is.na(central_start)) {
+  #     Verify_Dupes$EXS[index] = NA
+  #   
+  #     } else if (radius_start <= (central_start+START_RANGE) & radius_start >= (central_start-START_RANGE)) {
+  #     Verify_Dupes$EXS[index] = 1
+  #  
+  #     } else {
+  #     Verify_Dupes$EXS[index] = 0 }
+  #   
+  #   # testing if end year same within range
+  #    if (is.na(central_end) | is.na(radius_end)) {
+  #     Verify_Dupes$EXE[index] = NA
+  # 
+  #     }
+  #   else if (radius_end <= (central_end+END_RANGE) & radius_end >= (central_end-END_RANGE)) {
+  #     Verify_Dupes$EXE[index] = 1
+  #  
+  #     } 
+  #   else {
+  #     Verify_Dupes$EXE[index] = 0}
+  
+    
+    
+  #### DATE RANGES #####
+    rad_start_range = radius_cf_info$cf_start_year
+    rad_end_range = radius_cf_info$cf_end_year
+    cent_start_range = central_cf_info$cf_start_year
+    cent_end_range = central_cf_info$cf_end_year
+  
+#     # start year
+#      if (is.na(rad_start_range) | is.na(cent_start_range)) {
+#       Verify_Dupes$SD[index] = NA
+#     
+#       } else if (rad_start_range <= (cent_start_range + EARLY_DATE) & rad_start_range >= (cent_start_range - EARLY_DATE)) {
+#       Verify_Dupes$SD[index] = 1
+#    
+#       } else {
+#       Verify_Dupes$SD[index] = 0 }
+#     
+#     # testing if end year same within range
+#      if (is.na(cent_end_range) | is.na(rad_end_range)) {
+#       Verify_Dupes$ED[index] = NA
+# 
+#       }
+#     else if (rad_end_range <= (cent_end_range + LATE_DATE) & rad_end_range >= (cent_end_range - LATE_DATE)) {
+#       Verify_Dupes$ED[index] = 1
+#    
+#       } 
+#     else {
+#       Verify_Dupes$ED[index] = 0}   
+# }
+
+  if (rad_start_range == 0 & cent_start_range == 0) {
+    Verify_Dupes$SD[index] = 0
+  } else if (rad_start_range == 0 & cent_start_range != 0) {
+    Verify_Dupes$S[index] = abs((rad_start_range - cent_start_range)/rad_start_range)
+   } else {
+    Verify_Dupes$SD[index] = abs((cent_start_range - rad_start_range)/rad_start_range)
+  }
+
+  if (cent_end_range == 0 & rad_end_range == 0) {
+    Verify_Dupes$ED[index] = 0
+  }else if (cent_end_range == 0 & rad_end_range != 0) {
+    Verify_Dupes$S[index] = abs((rad_end_range - cent_end_range)/cent_end_range) 
+  } else {
+    Verify_Dupes$ED[index] = abs((cent_end_range - rad_end_range)/rad_end_range)
+  }
+}
+
+```
+
+(15) Filters Part II
+```{r}
+Verify_Dupes$sequential = NA
+Verify_Dupes$singleton = NA
+min.counts = min(Verify_Dupes$central_count + Verify_Dupes$radius_count)
+max.counts = max(Verify_Dupes$central_count + Verify_Dupes$radius_count)
+find.range = c(min.counts: max.counts)
+
+for (z in c(1:nrow(Verify_Dupes))) {
+  
+  point_ID = Verify_Dupes$central_cf[z]
+  central_cf_info = Dupe_CoinFinds[Dupe_CoinFinds$ID==Verify_Dupes$central_cf[z],]
+  
+  # radius coin find
+  radius_ID = Verify_Dupes$radius_cf[z]
+  radius_cf_info = Dupe_CoinFinds[Dupe_CoinFinds$ID==Verify_Dupes$radius_cf[z],]
+  
+  # Sequential ID Filter
+  if (abs(as.integer(point_ID) - as.integer(radius_ID)) == 1 ) {
+    Verify_Dupes$sequential[z] = 1
+  } else { Verify_Dupes$sequential[z] = 0 }
+  
+  # Coin Amount Filter
+    total = Verify_Dupes$central_count[z] + Verify_Dupes$radius_count[z]
+    percent = mean(find.range < total)
+    
+    Verify_Dupes$singleton[z] = percent
+  
+
+}
+
+```
+
+
+(16) Computing Match Score
+WEIGHTING:
+```{r message=TRUE}
+#compute match scores
+
+#fill match scores into the spread sheet
+Verify_Dupes$match.score = NA
+# for (i in c(1:nrow(Verify_Dupes))) {
+#   
+#   composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD", "ED")])
+#   
+#   Verify_Dupes$match.score[i] = composites
+# }
+
+z_G = as.vector(scale(Verify_Dupes$G, center = TRUE, scale = TRUE))
+z_B = as.vector(scale(Verify_Dupes$B, center = TRUE, scale = TRUE))
+z_S = as.vector(scale(Verify_Dupes$S, center = TRUE, scale = TRUE))
+z_ED = as.vector(scale(Verify_Dupes$ED, center = TRUE, scale = TRUE))
+z_SD = as.vector(scale(Verify_Dupes$SD, center = TRUE, scale = TRUE))
+
+for (i in c(1:nrow(Verify_Dupes))) {
+
+num =  ((-Verify_Dupes$sequential[i])*.1) + 
+  (Verify_Dupes$distribution[i]*.1) + 
+  ((Verify_Dupes$singleton[i])*.1) +
+  ((-(z_G[i])*.14)) +
+  ((-(z_S[i])*.14)) +
+  ((-(z_B[i])*.14)) +
+  ((-(z_SD[i])*.14)) +
+  ((-(z_ED[i])*.14))
+
+Verify_Dupes$match.score[i] = num
+}
+
+
+names(Verify_Dupes)[names(Verify_Dupes) == "G"] <- "gold"
+names(Verify_Dupes)[names(Verify_Dupes) == "S"] <- "silver"
+names(Verify_Dupes)[names(Verify_Dupes) == "B"] <- "bronze"
+names(Verify_Dupes)[names(Verify_Dupes) == "SD"] <- "start date"
+names(Verify_Dupes)[names(Verify_Dupes) == "ED"] <- "end date"
+names(Verify_Dupes)[names(Verify_Dupes) == "EXS"] <- "excavation start"
+names(Verify_Dupes)[names(Verify_Dupes) == "EXE"] <- "excavation end"
+
+```
+
+
+#############
+OUTPUTS:
+Run to get a spread sheet of coin finds that aren't in the Verify_Duplicates spread sheet because they have no other coin in their radius
+```{r}
+write_xlsx(disconsidered_CFs,"/cloud/project/Not_A_Duplicate.xlsx")
+```
+
+Excel spread sheet for manual matching
+```{r}
+write_xlsx(Verify_Dupes,"/cloud/project/VerifyDuplicates.xlsx")
+```
+
+
+
