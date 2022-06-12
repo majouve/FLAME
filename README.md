@@ -95,6 +95,8 @@ In all, there are 1,459 coin find pairs.
 
 ### (12) Removing Coin Find Pairs Already Addressed
 
+
+
 ### (13) Histogram Matching
 In this 
 
