@@ -107,41 +107,28 @@ If is.it.a.match has been marked TRUE or FALSE in the old VerifyDuplicates sprea
 ### (13) Histogram Matching
 In this section, histograms visualizing the coins minted per year within a coin find are compared within pairs to see how similar they are (x axis: years; y axis: number of coins minted per year). This is the same histogram found in FLAME's circulation application. The program uses a Kolmogorov–Smirnov test to compare the histograms. 
 
-This section loops through each pair of coin finds in VerifyDuplicates, populating a dataframe with values for each pair, building the histograms that will be compared: 
+This section loops through each pair of coin finds in VerifyDuplicates, populating a dataframe with values for each pair drawn from their respective coin groups, building the histograms that will be compared. In the Coin Groups data frame, the date ranges associated with each coin group are not standard, making it difficult to create a histogram (eg. Some might be 325-330, but others are 350-400). Therefore, I find how many coins per year are minted so that all coin group amounts can be compared evenly. 
+
+The histogram data frame is structured like the table below. 
 
 | year | central: coins per year | radius: coins per year | 
 | ---- | ----------------------- | ---------------------- | 
 | 325  |                         |                        |         
 | 326  |                         |                        |         
 
+NOTE: When creating the dataframe, I originally though that making it the length of the year span (325-750) of FLAME's data would be sufficient, that is 426 entries. However, some coin groups have year spans fall outside of the 325-750 range. Therefore, the histogram dataframe is longer that it should be. 
 
+For the number of coins found within each coin group, I use the following equation: (coins_minted / years over which coins were minted). 
 
+Then, I add this value to each year within the date range. 
 
-To calculate the number of coins in a bar, we divide the number of coins that were minted during a range (e.g. 325-330) by the number of years in that range, then add the results for each bar.
-For example, 30 coins over the 325-330 interval would result in 5 coins in each of the 6 years. Assuming there are no other coins, a bar covering 325-326 would have 10 coins (5 for each of the 2 years)
+After the histogram data frame is built, I perform the ks.test 
 
 
 ### (14) Filters Part I
 In this section, specific metrics of the coin find pairs are compared.
 
-
-VERSION 1:
-
-VERSION 2: 
-
-### (15) Filters Part II
-
-Are the cfIDs sequential?
-
-
-Where does the total amount of coins in the coin find pair fall in comparison to the other pairs?
-
-
-
-### (16) Computing Composites
-
-
-### (THREE) Quantity Filter
+### (A) Quantity Filter
 The amount of coins for each find is compared between members of a geographical cluster. 
 
 The user can set a tolerance for how large the difference between coin amounts has to be before the program will read them as being different. This is currently set to 5 (this means that if cfA has 5 coins and cfB has 7 coins, they will be marked as having the same amount of coins). 
@@ -160,7 +147,7 @@ The final output in the column will be c(0, 447).
 ***Hereafter, I will not do the 13293 to 13293 comparison. This understood comparison will always yield a TRUE as the first term of the output lists. 
 
 
-### (FOUR) Metal Filter
+### (B) Metal Filter
 The amount of coins of each metal for each find is compared between members of a cluster, producing a seperate TRUE/FALSE list for each metal. 
 
 First, for each coin find, all the coin amounts for the coin groups of a specific metal are added together to produce total amounts. Values for our example coin finds are listed in the tables at the top of the document. 
@@ -199,7 +186,7 @@ These are the column names for the total metal columns:
 - total.silver = 
 
 
-### (FIVE) Excavation Filter
+### (C) Excavation Filter
 The dates of the excavation start and end years are compared seperately between the central coin find and each radius coin find. 
 The same comparison occurs here as well for the variable excav.start.year and excav.end.year for each coin find in the cluster. The tolerance for this comparison is currently set to 2.
 
@@ -215,7 +202,7 @@ NOTE: Alternative outputs are:
 - NA as the component of a list (ex. c(0, 67, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
 
 
-### (SIX) Date Range Filter
+### (D) Date Range Filter
 The dates of the start and end years of a coin find are compared seperately between the central coin find and each radius coin find. 
 The same comparison occurs here as well for the variable is.cf.start.year.same and is.cf.end.year.same for each coin find in the cluster. The tolerance for this comparison is 2.
 
@@ -233,4 +220,19 @@ Then, it also produces to difference lists:
 NOTE: Alternative outputs are:
 NA: This occurs when the central coin find has NA for the start year or the end year
 NA as the component of a list (ex. c(0, 97, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
+
+
+### (15) Filters Part II
+
+Are the cfIDs sequential?
+
+
+Where does the total amount of coins in the coin find pair fall in comparison to the other pairs?
+
+
+
+### (16) Computing Composites
+
+
+
 
