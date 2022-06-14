@@ -4,7 +4,7 @@ PURPOSE: This program was made to identify possible duplicate coin finds (CFs) i
 
 INPUT: This program takes as inputs dataframes of the CFs, coin groups (CGs), and a key that describes which coin denominations correspond to specific metals. These three data sets can be found in this repository. A user can also input a spread sheet of coin finds that are not duplicates, and the program will disregard them. 
 
-OUTPUT : The program will output a spread sheet of the cfIDs of possible duplicates (CF A and CF B) for someone to manually check. There will be a blank YES/NO column for someone to input whether the pair are duplicates are not. In the column "match score," each possible duplicate pair will be assigned a number that quantifies the degree to which the two matches. The spread sheet will be sorted by the match score so that highest matches scores are at the top.
+OUTPUT : The program will output a spread sheet of the cfID pairs that are possible duplicates (CF A and CF B) for someone to manually check. There will be a blank YES/NO column for someone to input whether the pair are duplicates are not. In the column "match score," each possible duplicate pair will be assigned a number that quantifies the degree to which the two matches. The spread sheet will be sorted by the match score so that highest matches scores are at the top.
 
 ## Detailed Description
 
@@ -31,11 +31,17 @@ VerifyDuplicates.xlsx
 |   13293    | Le trésor byzantin..   |  9239     | Belgian excav... | 0 | 1 | 0 | 0  | 1  |  0  |  0  |     0   |  XXX   |  ---------- |    1 or 0     |
 
 G = Gold
-S = Silver 
+
+S = Silver
+
 B = Bronze
+
 SD = Start Date (date range on coins)
+
 ED = End Date (date range on coins)
+
 EXS = Excavation Start Date
+
 EXE = Excavation End Date
 
 ### (1 and 2) Packages and Loading Data
@@ -43,7 +49,7 @@ The most important package loaded is "sf," as it does the location matching port
 
 The second section takes the program's inputs. CoinFinds and CoinGroups are the product of downloading all coin data from the Circulation Application with no filters. Coin_Info is a key that defines which denominations correspond to each metal.
 
-Currently commented out right now is the option to input an old version of VerifyDuplicates with is.it.a.match filled out. This file will allow the program to take out all pairs that have already been checked in subsequent runs.
+Currently commented out right now is the option to input an old version of VerifyDuplicates with is.it.a.match filled out. This file will allow the program (section 12) to take out all pairs that have already been checked in subsequent runs.
 
 ### (3 and 4) Formatting Coin Denomination/Metals 
 In these sections, I reformat the coin denomination and metal information from Coin_Info and use it to create a new column in CoinGroups with the metal of each coin group. 
@@ -93,18 +99,31 @@ Section 10 created rows with some cf pairs having the same cf (ex. A and A), whi
 
 In all, there are 1,459 coin find pairs.
 
-### (12) Removing Coin Find Pairs Already Addressed
+### (12) (COMMENTED OUT) Removing Coin Find Pairs Already Addressed
+One you have taken the code from section 2 out of comments, you may use this section. Section 2 reads in a spread sheet of VerifyDuplicates.xlsx with is.it.a.match already filled out, which this code chunk uses to disconsider coin finds that have already been addressed. 
 
-
+If is.it.a.match has been marked TRUE or FALSE in the old VerifyDuplicates spreadsheet, then this pair is taken out of the new spreadsheet being developed. If is.it.a.match is empty, then the pair will remain in the new VerifyDuplicates spreadsheet. 
 
 ### (13) Histogram Matching
-In this 
+In this section, histograms visualizing the coins minted per year within a coin find are compared within pairs to see how similar they are (x axis: years; y axis: number of coins minted per year). This is the same histogram found in FLAME's circulation application. The program uses a Kolmogorov–Smirnov test to compare the histograms. 
+
+This section loops through each pair of coin finds in VerifyDuplicates, populating a dataframe with values for each pair, building the histograms that will be compared: 
+
+| year | central: coins per year | radius: coins per year | 
+| ---- | ----------------------- | ---------------------- | 
+| 325  |                         |                        |         
+| 326  |                         |                        |         
+
+
+
+
+To calculate the number of coins in a bar, we divide the number of coins that were minted during a range (e.g. 325-330) by the number of years in that range, then add the results for each bar.
+For example, 30 coins over the 325-330 interval would result in 5 coins in each of the 6 years. Assuming there are no other coins, a bar covering 325-326 would have 10 coins (5 for each of the 2 years)
 
 
 ### (14) Filters Part I
-In this section, specific metrics of the coin find pairs are compared. Currently, there are two different version of this section. 
+In this section, specific metrics of the coin find pairs are compared.
 
-The other version calculates the percent difference between the central and radius metrics. It also does not use excavation start and end dates because these metrics have more missingness. 
 
 VERSION 1:
 
