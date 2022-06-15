@@ -20,7 +20,7 @@ library(naniar)
 ```
 
 PROCESSING
-(2) Read in Data (Download Date: )
+(2) Read in Data 
 ```{r}
 CoinFinds = read.csv("CoinFinds.csv")
 ORIGINAL_cf = CoinFinds
@@ -29,6 +29,7 @@ ORIGINAL_cg = CoinGroups
 Coin_Info = read_excel("Coin_info.xlsx", sheet="Denominations")
 
 # # Disconsidered Coin Find excel sheet labeled Not_A_Duplicate.xlsx
+# Must un-comment if you are running section 12
 # old_VerDupes = read_excel("VerifyDuplicates.xlsx")
 
 ```
@@ -188,11 +189,6 @@ for (i in c(1:nrow(CoinFinds))) {
   CoinFinds$num.in.radius[index] = length(test.target$ID)
 }
 
-
-# Originally, I was going to take coin finds out that had no other finds in their radius but I decided not to. 
-# But I already ended up using Cut_CoinFinds as a variable name below, so I just keep it here. 
-Cut_CoinFinds = CoinFinds
-
 ```
 
 (9) Cut out finds with no other finds in their radius. 
@@ -260,7 +256,6 @@ for (i in c(1:nrow(Dupe_CoinFinds))) {
                    radius_bib = rep(NA, rows), 
                    radius_auth = rep(NA, rows),
                    
-                   # provisional
                    central_count = rep(NA, rows),
                    radius_count = rep(NA, rows)
                    
@@ -305,7 +300,6 @@ for (i in c(1:nrow(Verify_Dupes))) {
   Verify_Dupes$central_auth[i] = Dupe_CoinFinds$cf_user[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
   Verify_Dupes$radius_auth[i] = Dupe_CoinFinds$cf_user[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
   
-  # provisional
   Verify_Dupes$central_count[i] = Dupe_CoinFinds$cf_num_coins_found[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
   Verify_Dupes$radius_count[i] = Dupe_CoinFinds$cf_num_coins_found[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
 }
@@ -400,7 +394,6 @@ Verify_Dupes = Verify_Dupes[,1:(ncol(Verify_Dupes)-1)]
 
 ```
 
-####Commented Out/Still working
 (12) (Currently Commented Out) Disconsidered
 - this modules will delete pairs from Verify_Dupes if is.it.a.match has already been filled in. This indicates that the find pair has already been addressed. 
 ```{r}
@@ -408,7 +401,7 @@ Verify_Dupes$is.it.a.match = NA
 # Verify_Dupes$disconsidered = NA
 # for(i in c(1:nrow(old_VerDupes))) {
 #   
-#   if(!is.na(old_VerDupes$is.it.a.match[i])) {
+#   if(old_VerDupes$is.it.a.match[i]==TRUE | old_VerDupes$is.it.a.match[i]==FALSE) {
 #     
 #     Verify_Dupes$disconsidered[i] = TRUE
 #     
@@ -426,19 +419,14 @@ Verify_Dupes$is.it.a.match = NA
 ```
 
 (13) Histogram matching
-Do I try this without zeros?
 ```{r}
 Verify_Dupes$distribution = NA
 
-# 1st for loop that goes through verify_dupes
-# It creates two new data frames in for loop and populates them with 325-750)
-# Then it uses the coin groups to fill in for each cell proper values. 
-  # It would take (coin amount / ((start - end)+1) and then that ammount in each
-# then K-S test with p vals. no need to worry about x bc it's constant. 
-
-# create data frame for the histogram with years
+# create data frame for the histogram that for loop will fill out
+# dataframe is longer because of date ranges falling outside of 325-750
 Histogram = data.frame(year = rep(NA, (426+8+41)), coins.per.year.cent = rep(NA, (426+8+41)), coins.per.year.rad = rep(NA, (426+8+41)))
 
+# populate histogram with year values
 for (i in c(1:nrow(Histogram))) {
   Histogram$year[i] = (i-1) + 325
 }
@@ -446,6 +434,7 @@ for (i in c(1:nrow(Histogram))) {
 
 # put the coins.per.year values from CoinGroups into Histogram
 for (f in c(1:nrow(Verify_Dupes))) {
+
   Central = Hist_CoinGroups[CoinGroups$cfID == Verify_Dupes$central_cf[f],]
   Radius = Hist_CoinGroups[CoinGroups$cfID == Verify_Dupes$radius_cf[f],]
   
@@ -471,26 +460,30 @@ for (f in c(1:nrow(Verify_Dupes))) {
         Histogram$coins.per.year.rad[rad.index+e] = Histogram$coins.per.year.rad[rad.index+e] + coins.per.year 
       }  }
   
-  # Histogram = Histogram[Histogram$coins.per.year.cent>0,]
-  # Histogram = Histogram[Histogram$coins.per.year.rad>0,]
   # If value is TRUE (p < .05), the two histograms are DIFFERENT
   # If the value is FALSE (p >= .05), the two histograms are the SAME
     kstest = ks.test(Histogram$coins.per.year.cent, Histogram$coins.per.year.rad, exact = FALSE)
   if(kstest$p.value < .05) {
-    Verify_Dupes$distribution[f] = 1
-  } else {
     Verify_Dupes$distribution[f] = 0
+  } else {
+    Verify_Dupes$distribution[f] = 1
   }
   
   Histogram = replace_with_na_all(Histogram, ~.x>=0)
   Histogram[is.na(Histogram)] = 0
 }
 
+# create a visualization of the histogram comparable to the website
+# ggplot(Histogram, aes(x = year, y = coins.per.year.rad)) + 
+#   geom_bar(stat = "identity")
+
 ```
 ######END
 
 (14) Filters
-This module fills in the six metrics in Verify_Dupes by comparing between pairs. You can fill in the desired tolerances for the comparisons. 
+This module fills in the seven metrics in Verify_Dupes by comparing between pairs.
+However, excavation start and end dates are currently commented out because they have a high 
+degree of missingness. 
 ```{r}
 #EXCAVATION START AND END (ORIGINAL: 2)
 ####INPUT####
@@ -651,7 +644,7 @@ for (z in c(1:nrow(Verify_Dupes))) {
   if (rad_start_range == 0 & cent_start_range == 0) {
     Verify_Dupes$SD[index] = 0
   } else if (rad_start_range == 0 & cent_start_range != 0) {
-    Verify_Dupes$S[index] = abs((rad_start_range - cent_start_range)/rad_start_range)
+    Verify_Dupes$SD[index] = abs((rad_start_range - cent_start_range)/cent_start_range)
    } else {
     Verify_Dupes$SD[index] = abs((cent_start_range - rad_start_range)/rad_start_range)
   }
@@ -659,7 +652,7 @@ for (z in c(1:nrow(Verify_Dupes))) {
   if (cent_end_range == 0 & rad_end_range == 0) {
     Verify_Dupes$ED[index] = 0
   }else if (cent_end_range == 0 & rad_end_range != 0) {
-    Verify_Dupes$S[index] = abs((rad_end_range - cent_end_range)/cent_end_range) 
+    Verify_Dupes$ED[index] = abs((rad_end_range - cent_end_range)/cent_end_range) 
   } else {
     Verify_Dupes$ED[index] = abs((cent_end_range - rad_end_range)/rad_end_range)
   }
@@ -676,7 +669,7 @@ max.counts = max(Verify_Dupes$central_count + Verify_Dupes$radius_count)
 find.range = c(min.counts: max.counts)
 
 for (z in c(1:nrow(Verify_Dupes))) {
-  
+  #central coin find
   point_ID = Verify_Dupes$central_cf[z]
   central_cf_info = Dupe_CoinFinds[Dupe_CoinFinds$ID==Verify_Dupes$central_cf[z],]
   
@@ -689,7 +682,7 @@ for (z in c(1:nrow(Verify_Dupes))) {
     Verify_Dupes$sequential[z] = 1
   } else { Verify_Dupes$sequential[z] = 0 }
   
-  # Coin Amount Filter
+  # Coin Amount Filter (singleton)
     total = Verify_Dupes$central_count[z] + Verify_Dupes$radius_count[z]
     percent = mean(find.range < total)
     
@@ -708,19 +701,15 @@ WEIGHTING:
 
 #fill match scores into the spread sheet
 Verify_Dupes$match.score = NA
-# for (i in c(1:nrow(Verify_Dupes))) {
-#   
-#   composites = composite(Verify_Dupes[i, c("G", "S", "B", "SD", "ED")])
-#   
-#   Verify_Dupes$match.score[i] = composites
-# }
 
+#Normalizing the percent difference values
 z_G = as.vector(scale(Verify_Dupes$G, center = TRUE, scale = TRUE))
 z_B = as.vector(scale(Verify_Dupes$B, center = TRUE, scale = TRUE))
 z_S = as.vector(scale(Verify_Dupes$S, center = TRUE, scale = TRUE))
 z_ED = as.vector(scale(Verify_Dupes$ED, center = TRUE, scale = TRUE))
 z_SD = as.vector(scale(Verify_Dupes$SD, center = TRUE, scale = TRUE))
 
+#filling in the match score for each pair
 for (i in c(1:nrow(Verify_Dupes))) {
 
 num =  ((-Verify_Dupes$sequential[i])*.1) + 
@@ -735,25 +724,20 @@ num =  ((-Verify_Dupes$sequential[i])*.1) +
 Verify_Dupes$match.score[i] = num
 }
 
-
+#renaming the metrics to be more descriptive
 names(Verify_Dupes)[names(Verify_Dupes) == "G"] <- "gold"
 names(Verify_Dupes)[names(Verify_Dupes) == "S"] <- "silver"
 names(Verify_Dupes)[names(Verify_Dupes) == "B"] <- "bronze"
 names(Verify_Dupes)[names(Verify_Dupes) == "SD"] <- "start date"
 names(Verify_Dupes)[names(Verify_Dupes) == "ED"] <- "end date"
-names(Verify_Dupes)[names(Verify_Dupes) == "EXS"] <- "excavation start"
-names(Verify_Dupes)[names(Verify_Dupes) == "EXE"] <- "excavation end"
+# names(Verify_Dupes)[names(Verify_Dupes) == "EXS"] <- "excavation start"
+# names(Verify_Dupes)[names(Verify_Dupes) == "EXE"] <- "excavation end"
 
 ```
 
 
 #############
-OUTPUTS:
-Run to get a spread sheet of coin finds that aren't in the Verify_Duplicates spread sheet because they have no other coin in their radius
-```{r}
-write_xlsx(disconsidered_CFs,"/cloud/project/Not_A_Duplicate.xlsx")
-```
-
+OUTPUT:
 Excel spread sheet for manual matching
 ```{r}
 write_xlsx(Verify_Dupes,"/cloud/project/VerifyDuplicates.xlsx")
