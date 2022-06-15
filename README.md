@@ -158,12 +158,12 @@ Late date: abs(685-668) / 668 = .025
 
 There are few more metrics used to compare the pair of CFs: 
 
-#### (B) Sequential
+#### (A) Sequential
 
 If the IDs of the CFs are sequential (ex. 5473 and 5474), they are given a 1 in the sequential column of Verify_Duplicates and a 0 if not. 
 For our pair, the value in the "sequential" column would be 0. 
 
-#### (C) Singleton: Total Coin Find Amount Comparison
+#### (B) Singleton: Total Coin Find Amount Comparison
 
 CF pairs that are both singleton coin finds have a lower chance of being duplicates. This metric compares the total amount of coins within a pair to the other pairs, rating those on the lower end (ie. a total of 2) lower and those on the upper end (The max is 6701) higher. 
 
