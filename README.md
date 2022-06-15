@@ -15,7 +15,7 @@ INPUT:
 | cfID  |        name                                | x-coord  | y-coord  | excavation start | excavation end | start year | end year | num coins found | 
 | ----- | ------------------------------------------ | -------- | -------- | ---------------- | -------------- | ---------- | -------- | --------------- | 
 | 13293 | Le trésor byzantin de Nikerta              | 35.42224 | 36.40251 |     1968         |      1969      |    582     |     685  | 534             |
-| 9239  | Finds from Belgian excavation of Apamea    | 35.42224 | 36.40251 |       2005       |    2010        |     325    |   688    | 87              |
+| 9239  | Finds from Belgian excavation of Apamea    | 35.42224 | 36.40251 |       2005       |    2010        |     325    |   668    | 87              |
 
 | cfID  | Total Gold | Total Silver | Total Bronze | Total Lead |
 | ----- | ---------- | ------------ | ------------ | ---------- |
@@ -26,9 +26,13 @@ INPUT:
 OUTPUT: 
 
 VerifyDuplicates.xlsx
-| central_cf | central_name           | radius_cf |   radius_name    | G | S | B | SD | ED | EXS | EXE | sequent | single | match.score | is.it.a.match |
-| ---------- | ---------------------- | --------  | ---------------- | - | - | - | -- | -- | --- | --- | ------- | ------ | ----------- | ------------- |
-|   13293    | Le trésor byzantin..   |  9239     | Belgian excav... | 0 | 1 | 0 | 0  | 1  |  0  |  0  |     0   |  XXX   |  ---------- |    1 or 0     |
+| central_cf | central_name                     | central_bib | central_auth | radius_cf |   radius_name                      | radius_bib | radius_auth | 
+| ---------- | -------------------------------- | ----------- | ------------ | --------- | ---------------------------------  | ---------- | ----------- |
+|   13293    | Le trésor byzantin  de Nikertai  | Morrisson...| hsubeh19...  |   9239    | Finds from Belgian excav of Apamea | Finds...   |  pyzmark... |
+
+| distribution | G | S |   B   |   SD  |   ED   |   EXS  |   EXE  | sequential | single | match.score | is.it.a.match |
+| ------------ | - | - | ----- | ----- | ------ | ------ | ------ | ---------- | ------ | ----------- | ------------- |
+|     0        | 1 | 0 | .9885 | .791  |  .025  |  .018  |  .020  |       0    | .0924  |    -.348    |    1 or 0     |
 
 G = Gold
 
@@ -105,133 +109,87 @@ One you have taken the code from section 2 out of comments, you may use this sec
 If is.it.a.match has been marked TRUE or FALSE in the old VerifyDuplicates spreadsheet, then this pair is taken out of the new spreadsheet being developed. If is.it.a.match is empty, then the pair will remain in the new VerifyDuplicates spreadsheet. 
 
 ### (13) Histogram Matching
-In this section, histograms visualizing the coins minted per year within a coin find are compared within pairs to see how similar they are (x axis: years; y axis: number of coins minted per year). This is the same histogram found in FLAME's circulation application. The program uses a Kolmogorov–Smirnov test to compare the histograms. 
+In this section, histograms visualizing the coins minted per year within a coin find are compared within pairs to see how similar they are (x axis: years; y axis: number of coins minted per year). This is the same histogram found in FLAME's circulation application. I standardize the date ranges to all be 1 year to make the histograms comparable. The program uses a Kolmogorov–Smirnov test to compare the histograms. 
 
-This section loops through each pair of coin finds in VerifyDuplicates, populating a dataframe with values for each pair drawn from their respective coin groups, building the histograms that will be compared. In the Coin Groups data frame, the date ranges associated with each coin group are not standard, making it difficult to create a histogram (eg. Some might be 325-330, but others are 350-400). Therefore, I find how many coins per year are minted so that all coin group amounts can be compared evenly. 
+For our example cf pair, here is the histogram for 13293 (central coin find):
 
-The histogram data frame is structured like the table below. 
+<img width="805" alt="Screen Shot 2022-06-14 at 6 26 54 PM" src="https://user-images.githubusercontent.com/98130904/173709279-e527f69b-1fac-41a7-a025-55df7e7e4e83.png">
 
-| year | central: coins per year | radius: coins per year | 
-| ---- | ----------------------- | ---------------------- | 
-| 325  |                         |                        |         
-| 326  |                         |                        |         
+Here is the histogram for 9239:
 
-NOTE: When creating the dataframe, I originally though that making it the length of the year span (325-750) of FLAME's data would be sufficient, that is 426 entries. However, some coin groups have year spans fall outside of the 325-750 range. Therefore, the histogram dataframe is longer that it should be. 
+<img width="790" alt="Screen Shot 2022-06-14 at 6 27 57 PM" src="https://user-images.githubusercontent.com/98130904/173709395-120c1943-98e7-4ede-bc53-e2a54ed7d8e1.png">
 
-For the number of coins found within each coin group, I use the following equation: (coins_minted / years over which coins were minted). 
+Clearly, these distributions are not similar. Correspondingly, the ks.test reports a p value of <.05.
+ 
+Finally, I add the "distribution" column to the Verify_Duplicates dataframe. If the histograms match, then the pair receives a 1 for the column. If they do not match, the pair receives a 0. With our example of the pair (13293, 9239), they would receive a 0 in this column.
 
-Then, I add this value to each year within the date range. 
-
-After the histogram data frame is built, I perform the ks.test 
-
+NOTE: When creating the dataframe, I originally though that making it the length of the year span (325-750) of FLAME's data would be sufficient, that is 426 entries. However, some coin groups have year spans fall outside of the 325-750 range. Therefore, the histogram dataframe is longer that it should be.
 
 ### (14) Filters Part I
-In this section, specific metrics of the coin find pairs are compared.
+In this section, specific metrics of the coin find pairs are compared and metrics are added to the Verify_Duplicates data frame. The following attributes use percent difference calculations between the central and radius values in the Verify_Duplicates df as their metric: 
+-metal composition (how many coins of each metal are in a coin find)
+-start and end date (what is the date of the earliest date coin in a cf and what is the latest)
+-excavation start and end years 
 
-### (A) Quantity Filter
-The amount of coins for each find is compared between members of a geographical cluster. 
+All use the following equation: abs((central - radius)/radius). However, if the radius value is 0, I flip it to avoid an undefined value: abs((radius - central)/central). If both the radius and central values are 0, 0 is reported. 
 
-The user can set a tolerance for how large the difference between coin amounts has to be before the program will read them as being different. This is currently set to 5 (this means that if cfA has 5 coins and cfB has 7 coins, they will be marked as having the same amount of coins). 
+## (A) Metal Filter
+The amount of coins of each metal (bronze/silver/gold) is compared between the cf pair. 
+For the example pair (13293, 9239), this is the calculation: 
 
-For each coin find in the "in.radius" list (13293, 9239), the program will compare the central coin find to each coin amount value. 
+Gold (Remember, since the radius value is 0, the equation is flipped): abs(0-533) / 533 = 1
+Silver: Zero is reported because both values are 0. 
+Bronze: abs(1-87) / 87 = .9885
 
-The first cfID in the list is 13293, which has 534 coins. This number will be compared to 13293 (itself) and will ouput TRUE
-The second cfID in the list is 9239, which has 87 coins. This number will be compared to the central coin find, 13293 and will output FALSE. 
+## (C) Excavation Filter (Commented Out)
+This section is commented out because many values do not have excavation years listed, making it a less valuable metric.
+The dates of the excavation start and end years are compared seperately amongst the coin find pair. Here are the calculations for our example:
 
-This section outputs a list of TRUES/FALSES in the same order as the coin finds are originally listed in the "in.radius" list. This list goes into the "are.num.coins.same" column. The output for our example would be c(TRUE, FALSE). 
+Start year: abs(1968-2005) / 2005 = .018
+End year: abs(1969-2010) / 2010 = .020
 
-There is also a column (dif.num.coins) for the list of the differences between the central coin find and the radius coin finds (central cf - radius cf = 13293 - 9239 = 534 - 87 = 447)
+## (D) Date Range Filter
+The dates of the start and end years of a coin find are compared seperately between pairs. Here are the calculations for our example:
 
-The final output in the column will be c(0, 447).
-
-***Hereafter, I will not do the 13293 to 13293 comparison. This understood comparison will always yield a TRUE as the first term of the output lists. 
-
-
-### (B) Metal Filter
-The amount of coins of each metal for each find is compared between members of a cluster, producing a seperate TRUE/FALSE list for each metal. 
-
-First, for each coin find, all the coin amounts for the coin groups of a specific metal are added together to produce total amounts. Values for our example coin finds are listed in the tables at the top of the document. 
-
-The tolerance for this cluster works differently than the others. Within a coin find, for each coin group of a specific metal that is added together, the tolerance is increased by 1. For example, the tolerance for the bronze in 13293 is 1 because there is 1 bronze coin group. The tolerance for the gold in 13293 is 9 because there are 9 bronze coin groups. For 9239, the tolerance for bronze would be 58 because there are 58 bronze coin groups. 
-
-Now for the comparisons, 13293 is still the central find, and 9239 is the radius find:
-
-- 13293 has 533 gold coins and 9239 has 0 gold coins. (FALSE)
-- 13293 has 0 silver coins and 9239 has 0 silver coins. (TRUE)
-- 13293 has 1 bronze coin and 9239 has 87 bronze coins. (FALSE)
-- 13293 has 0 lead coins and 9239 has 0 lead coins. (TRUE)
-
-In this module, I also calculate the difference between the amount of coins for each metal between the central and radius coin finds. Here's what this looks like with our example (13293 - 9239 = central cf - radius cf): 
-
-- Gold: 533 - 0 = 533
-- Silver: 0 - 0 = 0
-- Bronze: 1 - 87 = -86
-- Lead: 0 - 0 = 0
-
-This module produces the following columns with the following example outputs:
-- is.bronze.same: c(TRUE, FALSE)
-- is.gold.same: c(TRUE, FALSE)
-- is.silver.same: c(TRUE, TRUE)
-- is.lead.same: c(TRUE, TRUE)
-
-- dif.silver = c(0, 533)
-- dif.gold = c(0,0)
-- dif.bronze = c(0, -86)
-- dif.lead = c(0,0)
-
-These are the column names for the total metal columns:
-- total.gold = 
-- total.silver = 
-- total.bronze = 
-- total.silver = 
-
-
-### (C) Excavation Filter
-The dates of the excavation start and end years are compared seperately between the central coin find and each radius coin find. 
-The same comparison occurs here as well for the variable excav.start.year and excav.end.year for each coin find in the cluster. The tolerance for this comparison is currently set to 2.
-
-- 13293's excavation started in 2005, and 9239's started in 1969. (FALSE)
-- 13293's excavation ended in 1968, and 9239's ended in 2010. (FALSE)
-
-Therefore, this module produces two lists
-- are.excav.start.same = c(TRUE, FALSE)
-- are.excav.end.same = c(TRUE, FALSE)
-
-NOTE: Alternative outputs are:
-- NA: This occurs when the central coin find has NA for the start year or the end year.
-- NA as the component of a list (ex. c(0, 67, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
-
-
-### (D) Date Range Filter
-The dates of the start and end years of a coin find are compared seperately between the central coin find and each radius coin find. 
-The same comparison occurs here as well for the variable is.cf.start.year.same and is.cf.end.year.same for each coin find in the cluster. The tolerance for this comparison is 2.
-
-- 13293's excavation started in 582, and 9239's started in -300. (FALSE)
-- 13293's excavation ended in 685, and 9239's ended in 750. (FALSE)
-
-Therefore, this module produces two lists
-- is.cf.start.year.same = c(TRUE, FALSE)
-- is.cf.end.year.same = c(TRUE, FALSE)
-
-Then, it also produces to difference lists:
-- start.date.dif = c(0, 882)
-- end.date.dife = c(0, -65)
-
-NOTE: Alternative outputs are:
-NA: This occurs when the central coin find has NA for the start year or the end year
-NA as the component of a list (ex. c(0, 97, NA)): This occurs when one of the radius years has an NA listed for the start year or end year
-
+Early date: abs(582-325) / 325 = .791
+Late date: abs(685-668) / 668 = .025
 
 ### (15) Filters Part II
 
-Are the cfIDs sequential?
+There are few more metrics used to compare the pair of cfs: 
 
+## (B) Sequential
 
-Where does the total amount of coins in the coin find pair fall in comparison to the other pairs?
+If the IDs of the cfs are sequential (ex. 5473 and 5474), they are given a 1 in the "sequential" column of the data frame and a 0 if not. 
+For our pair, the value in the "sequential" column would be 0. 
 
+## (C) Singelton: Total Coin Find Amount Comparison
 
+Coin find pairs that are both singelton coin finds have a lower chance of being duplicates. This metric compares the total amount of coins within a pair to the other paris, rating those on the lower end (ie. a total of 2) lower and those on the upper end (The max is 6701) higher. 
+
+First the amount of coins total in a coin find pair is totaled up (radius + central). Then I compare this total to a distribution all the totals Verify_Dupes to see what percent of values is less than this total. 
+
+For our example pair, 13293 has a total of 534 coins. 9239 has a total of 87 coins. The total between them in 621. In a distribution of totals ranging from 2 to 6701, it is larger than 9.23% of values. 
+
+The value .0923 is entered into the singelton column.
 
 ### (16) Computing Composites
+
+The above metrics are combined into a single score so that the pairs more likely to be duplicates can be sorted to the top. Before doing the calculation, I use the scale() function to normalize the percent different calculations. Some percent difference values are so large (~2,000) that they would overshadow the sequnetial and singleton metrics, which can only be as high as 1. 
+
+The higher the match score, the more likely a coin find pair is to a match. The variables distribution and singleton are added together for this metric because as they increase, the likelihood of a match increases. However, sequential, silver, bronze, gold, start date, and end date are subtracted in the equation because as the percent difference scores increase, the liklihood of a match decreases. 
+
+This is the equation used to find the composite score:
+
+Distribution * .1 + Singleton * .1 - Sequential * .1 - Gold * .14 - Silver * .14 - Bronze * .14 - Start Date * .14 - End Date * .14 
+
+For our examples pair this produces a score of: 
+
+(0 * 1) + (.0924 * .1) - (0 * .1) - (1 * .14) - (0 * .14) - (.9885 * .14) - (.791 * .14) - (.025 * .14) = -.348
+
+
+
+
 
 
 
