@@ -96,6 +96,10 @@ Then I start to construct the output data frame. I break down the coin find clus
 
 With our example, the program would create the entry listed at the beginning of this file under output. 
 
+***I also eliminated duplicate pairs that have a difference in coin finds of above 300. This change made a big difference in making the match score more predictive. The large outlier duplicates, some with coin find amount differences of 1000 to 6000, were throwing off metrics that placed coins on a distribution based on how large the difference in coin find amounts between duplicate pairs was. Duplicate pairs with differences of 50-100 were receiving higher match scores because they were a much better match than those with differences in the thousands. 
+
+This deletion does strike the current example out of the data set; however, the calculations are all still the same.***
+
 ### (11) Delete Redundant Pairs/Those Not to be Considered
 CFs that are both within a database that FLAME imported are likely not duplicates. Therefore, if coins within a pair both were labeled with CHRE or PAS or they were entered by the user "PeterPhilips," that pair is struck.
 
@@ -173,6 +177,15 @@ For our example pair, 13293 has a total of 534 coins. 9239 has a total of 87 coi
 
 The value .0923 is entered into the singleton column.
 
+#### (C) Total Difference 
+For each pair, I subtract the radius coin find amount from the central coin find amount. Then I calculate where each value falls on a distribution of all these differences. For example, if the greatest difference is 300, then total.dif would be 0, and if the smallest difference is 0, then total.dif would be 1.  All other differences would be some fraction of 1.
+
+In our example this would be: 
+
+For our example pair, 13293 has a total of 534 coins. 9239 has a total of 87 coins. The total between them in 447. Because this value would actually disqualify it from being in Verify_Dupes, I will assign it with a total.dif score of 0. In a distribution of differences ranging from 1 to 300, it is smaller than 0% of values. 
+
+The value of 0 is entered into the singleton column.
+
 ### (16) Computing Composites
 
 The above metrics are combined into a single score so that the pairs more likely to be duplicates can be sorted to the top. Before doing the calculation, I use the scale() function to normalize the percent different calculations. Some percent difference values are so large (~2,000) that they would overshadow the sequential and singleton metrics, which can only be as high as 1. 
@@ -181,8 +194,9 @@ The higher the match score, the more likely a coin find pair is to be a match. T
 
 This is the equation used to find the composite score:
 
-Distribution * .1 + Singleton * .1 - Sequential * .1 - Gold * .14 - Silver * .14 - Bronze * .14 - Start Date * .14 - End Date * .14 
+Distribution * .1 + Singleton * .005 - Sequential * .1 + total.dif * 2 - Gold * .1 - Silver * .1 - Bronze * .1 - Start Date * .1 - End Date * .1 
 
 For our examples pair this produces a score of: 
 
-(0 * 1) + (.0924 * .1) - (0 * .1) - (1 * .14) - (0 * .14) - (.9885 * .14) - (.791 * .14) - (.025 * .14) = -.348
+(0 * .1) + (.0924 * .005) - (0 * .1) + 0 * 2 - (1 * .14) - (0 * .14) - (.9885 * .14) - (.791 * .14) - (.025 * .14) = -.348
+
