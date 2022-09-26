@@ -17,6 +17,8 @@ library(multicon)
 library(ks)
 library(xtable)
 library(naniar)
+library(caret)
+library(psych)
 ```
 
 PROCESSING
@@ -295,7 +297,7 @@ for (i in c(1:nrow(Verify_Dupes))) {
   Verify_Dupes$radius_name[i] = Dupe_CoinFinds$cf_name[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
   
   Verify_Dupes$central_bib[i] = Dupe_CoinFinds$cf_publication_ref[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
-  Verify_Dupes$radius_bib[i] = Dupe_CoinFinds$cf_name[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
+  Verify_Dupes$radius_bib[i] = Dupe_CoinFinds$cf_publication_ref[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
   
   Verify_Dupes$central_auth[i] = Dupe_CoinFinds$cf_user[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
   Verify_Dupes$radius_auth[i] = Dupe_CoinFinds$cf_user[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
@@ -303,6 +305,10 @@ for (i in c(1:nrow(Verify_Dupes))) {
   Verify_Dupes$central_count[i] = Dupe_CoinFinds$cf_num_coins_found[Verify_Dupes$central_cf[i] == Dupe_CoinFinds$ID]
   Verify_Dupes$radius_count[i] = Dupe_CoinFinds$cf_num_coins_found[Verify_Dupes$radius_cf[i] == Dupe_CoinFinds$ID]
 }
+
+outliers = Verify_Dupes[abs(Verify_Dupes$central_count - Verify_Dupes$radius_count)>300, ]
+Verify_Dupes = Verify_Dupes[abs(Verify_Dupes$central_count - Verify_Dupes$radius_count)<300, ]
+Verify_Dupes$dupe.id = c(1:nrow(Verify_Dupes))
 
 ```
 
@@ -693,6 +699,19 @@ for (z in c(1:nrow(Verify_Dupes))) {
 
 ```
 
+(16) Filters Part III
+```{r}
+
+Verify_Dupes$total.dif = abs(Verify_Dupes$central_count - Verify_Dupes$radius_count)
+dif.range = c(min(Verify_Dupes$total.dif): max(Verify_Dupes$total.dif))
+
+for (z in c(1:nrow(Verify_Dupes))) {
+  percent_dif[z] = mean(dif.range > Verify_Dupes$total.dif[z])
+  Verify_Dupes$total.dif[z] = percent_dif[z]
+}
+
+```
+
 
 (16) Computing Match Score
 WEIGHTING:
@@ -700,47 +719,128 @@ WEIGHTING:
 #compute match scores
 
 #fill match scores into the spread sheet
-Verify_Dupes$match.score = NA
 
 #Normalizing the percent difference values
-z_G = as.vector(scale(Verify_Dupes$G, center = TRUE, scale = TRUE))
-z_B = as.vector(scale(Verify_Dupes$B, center = TRUE, scale = TRUE))
-z_S = as.vector(scale(Verify_Dupes$S, center = TRUE, scale = TRUE))
-z_ED = as.vector(scale(Verify_Dupes$ED, center = TRUE, scale = TRUE))
-z_SD = as.vector(scale(Verify_Dupes$SD, center = TRUE, scale = TRUE))
+
+
+z_G <- (Verify_Dupes$G - (mean(Verify_Dupes$G)))/(sd(Verify_Dupes$G))
+z_B <- (Verify_Dupes$B - (mean(Verify_Dupes$B)))/(sd(Verify_Dupes$B))
+z_S <- (Verify_Dupes$S - (mean(Verify_Dupes$S)))/(sd(Verify_Dupes$S))
+z_ED <- (Verify_Dupes$ED - (mean(Verify_Dupes$ED)))/(sd(Verify_Dupes$ED))
+z_SD <- (Verify_Dupes$SD - (mean(Verify_Dupes$SD)))/(sd(Verify_Dupes$SD))
+
+z_sequ <- (Verify_Dupes$sequential - (mean(Verify_Dupes$sequential)))/(sd(Verify_Dupes$sequential))
+z_single <- (Verify_Dupes$singleton - (mean(Verify_Dupes$singleton)))/(sd(Verify_Dupes$singleton))
+z_hist <- (Verify_Dupes$distribution - (mean(Verify_Dupes$distribution)))/(sd(Verify_Dupes$distribution))
+z_totdif <- (Verify_Dupes$total.dif - (mean(Verify_Dupes$total.dif)))/(sd(Verify_Dupes$total.dif))
+
+
+# z_VD = data.frame(z_sequ, z_single, z_hist)
+# 
+# psych::alpha(z_VD, check.keys=TRUE)
 
 #filling in the match score for each pair
 for (i in c(1:nrow(Verify_Dupes))) {
 
-num =  ((-Verify_Dupes$sequential[i])*.1) + 
-  (Verify_Dupes$distribution[i]*.1) + 
-  ((Verify_Dupes$singleton[i])*.1) +
-  ((-(z_G[i])*.14)) +
-  ((-(z_S[i])*.14)) +
-  ((-(z_B[i])*.14)) +
-  ((-(z_SD[i])*.14)) +
-  ((-(z_ED[i])*.14))
+# num =  (-(z_sequ[i])) +
+#   (z_hist[i]) +
+#   ((z_single[i])) +
+#   ((z_totdif[i])) +
+#   ((-(z_G[i]))) +
+#   ((-(z_S[i]))) +
+#   ((-(z_B[i]))) +
+#   ((-(z_SD[i])))*5 +
+#   ((-(z_ED[i])))*5
+# 
+# Verify_Dupes$ms.original[i] = num
+##############################
 
-Verify_Dupes$match.score[i] = num
+num =  (-(z_sequ[i])) +
+  (z_hist[i]) +
+  ((z_single[i])) +
+  ((z_totdif[i])) +
+  ((-(z_G[i]))) +
+  ((-(z_S[i]))) +
+  ((-(z_B[i]))) +
+  ((-(z_SD[i]))) +
+  ((-(z_ED[i])))
+
+Verify_Dupes$ms.norm[i] = num
+###############################
+
+num =  (-(z_sequ[i]))*.1 +
+  (z_hist[i])*.1 +
+  ((z_single[i]))*.005 +
+  ((z_totdif[i]))*2 +
+  ((-(z_G[i])))*.1 +
+  ((-(z_S[i])))*.1 +
+  ((-(z_B[i])))*.1 +
+  ((-(z_SD[i])))*.1 +
+  ((-(z_ED[i])))*.1
+
+Verify_Dupes$ms.A[i] = num
+#################################
+
+
+
 }
 
-#renaming the metrics to be more descriptive
-names(Verify_Dupes)[names(Verify_Dupes) == "G"] <- "gold"
-names(Verify_Dupes)[names(Verify_Dupes) == "S"] <- "silver"
-names(Verify_Dupes)[names(Verify_Dupes) == "B"] <- "bronze"
-names(Verify_Dupes)[names(Verify_Dupes) == "SD"] <- "start date"
-names(Verify_Dupes)[names(Verify_Dupes) == "ED"] <- "end date"
-# names(Verify_Dupes)[names(Verify_Dupes) == "EXS"] <- "excavation start"
-# names(Verify_Dupes)[names(Verify_Dupes) == "EXE"] <- "excavation end"
+# create columns where you tweak equation: with start and end date being increased
+# create difference in coin find ammount metric 
+
+# #renaming the metrics to be more descriptive
+# names(Verify_Dupes)[names(Verify_Dupes) == "G"] <- "gold"
+# names(Verify_Dupes)[names(Verify_Dupes) == "S"] <- "silver"
+# names(Verify_Dupes)[names(Verify_Dupes) == "B"] <- "bronze"
+# names(Verify_Dupes)[names(Verify_Dupes) == "SD"] <- "start date"
+# names(Verify_Dupes)[names(Verify_Dupes) == "ED"] <- "end date"
+# # names(Verify_Dupes)[names(Verify_Dupes) == "EXS"] <- "excavation start"
+# # names(Verify_Dupes)[names(Verify_Dupes) == "EXE"] <- "excavation end"
 
 ```
+
+
+```{r}
+
+plot = lm((abs(Verify_Dupes$central_count-Verify_Dupes$radius_count)~Verify_Dupes$ms.A))
+print(summary(plot))
+
+plot(Verify_Dupes$ms.A, abs(Verify_Dupes$central_count-Verify_Dupes$radius_count), xlab="match score", ylab="Dif in coin amounts")
+abline(lm(abs(Verify_Dupes$central_count-Verify_Dupes$radius_count)~Verify_Dupes$ms.A))
+
+# regress_DF = data.frame(match.score = Verify_Dupes$ms.original, dif = abs(Verify_Dupes$central_count-Verify_Dupes$radius_count))
+# 
+# outliers <- Verify_Dupes[abs(rstandard(plot)) > 3, ]
+# print(outliers)
+# 
+# for(i in c(1:nrow(Verify_Dupes))) {
+#   
+#   if (Verify_Dupes$dupe.id[i] %in% outliers$dupe.id){
+#     Verify_Dupes$outlier[i] = Verify_Dupes$outlier[i] + 1
+#   }
+#   
+# }
+# 
+# overall_outliers = Verify_Dupes[Verify_Dupes$outlier!=0,]
+```
+
+
+Which pairs show up the most as residuals when we overweight values?
+```{r}
+
+
+
+
+
+```
+
 
 
 #############
 OUTPUT:
 Excel spread sheet for manual matching
 ```{r}
-write_xlsx(Verify_Dupes,"/cloud/project/VerifyDuplicates.xlsx")
+write_xlsx(Verify_Dupes,"/cloud/project/VerifyDupes.xlsx")
 ```
 
 
