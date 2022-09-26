@@ -188,9 +188,11 @@ The value of 0 is entered into the singleton column.
 
 ### (16) Computing Composites
 
-The above metrics are combined into a single score so that the pairs more likely to be duplicates can be sorted to the top. Before doing the calculation, I use the scale() function to normalize the percent different calculations. Some percent difference values are so large (~2,000) that they would overshadow the sequential and singleton metrics, which can only be as high as 1. 
+The above metrics are combined into a single score so that the pairs more likely to be duplicates can be sorted to the top. Before doing the calculation, I use the scale() function to normalize the percent different calculations. 
 
 The higher the match score, the more likely a coin find pair is to be a match. The variables distribution and singleton are added together for this metric because as they increase, the likelihood of a match increases. However, silver, bronze, gold, start date, and end date are subtracted in the equation because as the percent difference scores increase, the likelihood of a match decreases. Sequential is subtracted because if cfIDs are sequential the program will report a 1, which means they are less likely to be a pair. 
+
+I have weighted “total.dif” the most because it is most related to whether the coin find amounts in a pair are equal. I have weighted singleton the least, since in earlier test, when overweighting this metric, it caused a positive correlation between match score and coin amounts (I didn’t include the graph here for brevity). The other metrics I’ve weighted equally because they all are not really correlated with the difference in coin amounts.
 
 This is the equation used to find the composite score:
 
